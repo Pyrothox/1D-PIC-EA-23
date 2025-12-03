@@ -1,0 +1,267 @@
+LXCat, www.lxcat.net
+Generated on 04 Nov 2016. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Phelps database, www.lxcat.net, retrieved on November 4, 2016.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+CROSS SECTION DATA FORMAT
+In downloaded files, each collision process is defined by a block consisting of
+1st line
+Keyword in capitals indicating the type of the collision. Possible collision types are elastic, effective, excitation,
+ionization, or attachment (capital letters required, key words are case sensitive), where "elastic" is used to denote
+the elastic momentum transfer cross section and where "effective" denotes the total momentum transfer cross section (sum
+of elastic momentum transfer and total inelastic cross sections).  The latter is useful for solving the Boltzmann
+equation in the 2-term approximation.
+2nd line
+Name of the target particle species. This name is a character string, freely chosen by the user, e.g. "Ar". Optionally
+for excitation processes, the name of the corresponding excited state can be specified on the same line, separated from
+the first name either by arrow "->" (dash + greater than) or by double-head arrow "<->" (less than + dash +
+greater than), e.g. "Ar -> Ar*" and "Ar <-> Ar*", respectively. In the later case BOLSIG+ will automatically
+define the inverse superelastic process, constructing the superelastic cross-section by detailed balancing, and
+considering the indicated excited state as the target. In this case, the ratio of statistical weights must be input in
+the 3rd line (see below).  Alternatively, superelastic collisions could be defined explicitly as excitation collisions
+with a negative electron energy loss with user input cross sections and species name, "Ar*", for example.
+3rd line
+For elastic and effective collisions, the ratio of the electron mass to the target particle mass. For excitation or
+ionization collisions, the electron energy loss (nominally the threshold energy) in eV. For attachment, the 3rd line is
+missing. In case of an excitation process where an excited state has been indicated on the 2nd line using double-head
+arrow "<->", the 3rd line must specify also ratio of the statistical weights of the final state to the initial state
+as the second parameter in 3rd line this is needed by BOLSIG+ to calculate the de-excitation cross-section.
+from 4th line (optionally)
+User comments and reference information, maximum 100 lines. The only constraint on format is that these comment lines
+must not start with a number.
+Finally
+Table of the cross section as a function of energy. The table starts and ends by a line of dashes "------" (at least 5),
+and has otherwise two numbers per line: the energy in eV and the cross section in m2.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Phelps database
+PERMLINK:         www.lxcat.net/Phelps
+DESCRIPTION:      A compilation of atomic and molecular data, assembled and evaluated by A.V. Phelps and collaborators.
+                  Please refer to these data using the sources cited for each gas. 
+                  
+                  We make no claims for these cross sections beyond those stated in the papers where they are published
+                  or cited.  In most cases these cross sections were assembled in the 1970's and 1980's. In only a few
+                  cases have they been modified or tested since that time. I do not plan any updates.  Additions have
+                  been made when cross sections have been assembled for other purposes. Since the JILA information
+                  center was closed by NIST, there is no one there to help you.  Opinions expressed are those of AV
+                  Phelps and do not imply JILA, CU, or NIST approval.
+CONTACT:          A.V. Phelps, Fellow Adjoint of JILA
+                  University of Colorado
+                  Boulder, CO 80309-0440
+                  e-mail: avp@@jila.colorado.edu
+HOW TO REFERENCE: http://jilawww.colorado.edu/~avp/
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+**************************************************************************************************************
+
+**************************************************************************************************************
+
+SPECIES: I2^+ / I^-
+PROCESS: I2 + + I- -> I + I2, RECOMBINATION
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+1.000000e-04 3.310685e-15
+1.096986e-04 3.160948e-15
+1.203378e-04 3.017983e-15
+1.320088e-04 2.881485e-15
+1.448118e-04 2.751160e-15
+1.588565e-04 2.626729e-15
+1.742633e-04 2.507926e-15
+1.911644e-04 2.394497e-15
+2.097046e-04 2.286198e-15
+2.300430e-04 2.182797e-15
+2.523539e-04 2.084072e-15
+2.768287e-04 1.989813e-15
+3.036771e-04 1.899817e-15
+3.331295e-04 1.813891e-15
+3.654383e-04 1.731852e-15
+4.008806e-04 1.653523e-15
+4.397604e-04 1.578737e-15
+4.824109e-04 1.507333e-15
+5.291979e-04 1.439159e-15
+5.805226e-04 1.374068e-15
+6.368250e-04 1.311921e-15
+6.985880e-04 1.252585e-15
+7.663411e-04 1.195933e-15
+8.406653e-04 1.141843e-15
+9.221979e-04 1.090199e-15
+1.011638e-03 1.040891e-15
+1.109752e-03 9.938132e-16
+1.217383e-03 9.488646e-16
+1.335452e-03 9.059490e-16
+1.464971e-03 8.649744e-16
+1.607053e-03 8.258530e-16
+1.762914e-03 7.885010e-16
+1.933892e-03 7.528383e-16
+2.121452e-03 7.187887e-16
+2.327202e-03 6.862790e-16
+2.552908e-03 6.552397e-16
+2.800504e-03 6.256043e-16
+3.072113e-03 5.973092e-16
+3.370064e-03 5.702939e-16
+3.696913e-03 5.445004e-16
+4.055461e-03 5.198735e-16
+4.448783e-03 4.963605e-16
+4.880252e-03 4.739109e-16
+5.353567e-03 4.524767e-16
+5.872787e-03 4.320119e-16
+6.442364e-03 4.124727e-16
+7.067181e-03 3.938172e-16
+7.752597e-03 3.760055e-16
+8.504489e-03 3.589994e-16
+9.329304e-03 3.427624e-16
+1.023411e-02 3.272598e-16
+1.122668e-02 3.124584e-16
+1.231551e-02 2.983264e-16
+1.350994e-02 2.848336e-16
+1.482021e-02 2.719510e-16
+1.625756e-02 2.596511e-16
+1.783431e-02 2.479075e-16
+1.956398e-02 2.366950e-16
+2.146141e-02 2.259897e-16
+2.354286e-02 2.157686e-16
+2.582619e-02 2.060097e-16
+2.833096e-02 1.966922e-16
+3.107866e-02 1.877961e-16
+3.409285e-02 1.793024e-16
+3.739937e-02 1.711929e-16
+4.102658e-02 1.634501e-16
+4.500558e-02 1.560575e-16
+4.937048e-02 1.489993e-16
+5.415871e-02 1.422603e-16
+5.941134e-02 1.358261e-16
+6.517340e-02 1.296829e-16
+7.149429e-02 1.238175e-16
+7.842822e-02 1.182175e-16
+8.603464e-02 1.128707e-16
+9.437878e-02 1.077657e-16
+1.035322e-01 1.028916e-16
+1.135733e-01 9.823803e-17
+1.245883e-01 9.379488e-17
+1.366716e-01 8.955269e-17
+1.499268e-01 8.550236e-17
+1.644676e-01 8.163523e-17
+1.804186e-01 7.794300e-17
+1.979167e-01 7.441776e-17
+2.171118e-01 7.105197e-17
+2.381686e-01 6.783840e-17
+2.612675e-01 6.477018e-17
+2.866068e-01 6.184073e-17
+3.144035e-01 5.904377e-17
+3.448962e-01 5.637332e-17
+3.783463e-01 5.382364e-17
+4.150405e-01 5.138929e-17
+4.552935e-01 4.906503e-17
+4.994505e-01 4.684590e-17
+5.478901e-01 4.472714e-17
+6.010277e-01 4.270420e-17
+6.593188e-01 4.077276e-17
+7.232634e-01 3.892867e-17
+7.934097e-01 3.716799e-17
+8.703591e-01 3.548694e-17
+9.547716e-01 3.388192e-17
+1.047371e+00 3.234950e-17
+1.148951e+00 3.088638e-17
+1.260383e+00 2.948944e-17
+1.382622e+00 2.815568e-17
+1.516717e+00 2.688225e-17
+1.663817e+00 2.566641e-17
+1.825183e+00 2.450556e-17
+2.002200e+00 2.339721e-17
+2.196385e+00 2.233899e-17
+2.409404e+00 2.132863e-17
+2.643081e+00 2.036397e-17
+2.899423e+00 1.944294e-17
+3.180626e+00 1.856357e-17
+3.489101e+00 1.772397e-17
+3.827494e+00 1.692234e-17
+4.198707e+00 1.615697e-17
+4.605922e+00 1.542622e-17
+5.052631e+00 1.472852e-17
+5.542665e+00 1.406237e-17
+6.080224e+00 1.342635e-17
+6.669920e+00 1.281910e-17
+7.316807e+00 1.223931e-17
+8.026434e+00 1.168575e-17
+8.804884e+00 1.115722e-17
+9.658832e+00 1.065260e-17
+1.059560e+01 1.017080e-17
+1.162322e+01 9.710789e-18
+1.275051e+01 9.271585e-18
+1.398713e+01 8.852246e-18
+1.534368e+01 8.451874e-18
+1.683180e+01 8.069609e-18
+1.846425e+01 7.704634e-18
+2.025502e+01 7.356165e-18
+2.221947e+01 7.023458e-18
+2.437444e+01 6.705798e-18
+2.673842e+01 6.402506e-18
+2.933166e+01 6.112931e-18
+3.217642e+01 5.836453e-18
+3.529707e+01 5.572479e-18
+3.872039e+01 5.320445e-18
+4.247572e+01 5.079810e-18
+4.659526e+01 4.850058e-18
+5.111433e+01 4.630698e-18
+5.607170e+01 4.421259e-18
+6.150986e+01 4.221293e-18
+6.747544e+01 4.030370e-18
+7.401960e+01 3.848083e-18
+8.119845e+01 3.674041e-18
+8.907355e+01 3.507870e-18
+9.771242e+01 3.349214e-18
+1.071891e+02 3.197735e-18
+1.175850e+02 3.053106e-18
+1.289890e+02 2.915019e-18
+1.414991e+02 2.783178e-18
+1.552225e+02 2.657299e-18
+1.702769e+02 2.537114e-18
+1.867914e+02 2.422364e-18
+2.049075e+02 2.312804e-18
+2.247806e+02 2.208200e-18
+2.465811e+02 2.108327e-18
+2.704960e+02 2.012971e-18
+2.967302e+02 1.921927e-18
+3.255089e+02 1.835001e-18
+3.570786e+02 1.752007e-18
+3.917101e+02 1.672767e-18
+4.297005e+02 1.597110e-18
+4.713753e+02 1.524876e-18
+5.170920e+02 1.455908e-18
+5.672426e+02 1.390060e-18
+6.222571e+02 1.327189e-18
+6.826072e+02 1.267163e-18
+7.488104e+02 1.209851e-18
+8.214344e+02 1.155131e-18
+9.011018e+02 1.102887e-18
+9.884959e+02 1.053005e-18
+1.084366e+03 1.005379e-18
+1.189534e+03 9.599075e-19
+1.304902e+03 9.164924e-19
+1.431459e+03 8.750409e-19
+1.570290e+03 8.354642e-19
+1.722586e+03 7.976775e-19
+1.889652e+03 7.615999e-19
+2.072922e+03 7.271539e-19
+2.273966e+03 6.942659e-19
+2.494508e+03 6.628654e-19
+2.736440e+03 6.328851e-19
+3.001836e+03 6.042607e-19
+3.292971e+03 5.769310e-19
+3.612343e+03 5.508373e-19
+3.962689e+03 5.259238e-19
+4.347013e+03 5.021371e-19
+4.768612e+03 4.794263e-19
+5.231099e+03 4.577426e-19
+5.738442e+03 4.370396e-19
+6.294989e+03 4.172730e-19
+6.905514e+03 3.984005e-19
+7.575250e+03 3.803814e-19
+8.309942e+03 3.631774e-19
+9.115888e+03 3.467515e-19
+1.000000e+04 3.310685e-19
+----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx

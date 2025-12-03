@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pic"
+version = "0.0.1"
+authors = [
+  { name="Nicolas Lequette", email="nicolas.lequette@lpp.polytechnique.fr" },
+  { name="Antoine Tavant"},
+
+]
+description = "A 1D PIC MCC code"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: GNU GENERAL PUBLIC LICENSE",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "astropy",
+    "plasmapy",
+    "scipy",
+    "numba",
+    "h5py",
+    "icecream",
+    "plotext>=5.3.2",
+]
+
+[tool.setuptools]
+packages = ["pic"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+    "pytest>=8.4.0",
+    "ruff>=0.11.13",
+]
+
+

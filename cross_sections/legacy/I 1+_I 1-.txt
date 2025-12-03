@@ -1,0 +1,267 @@
+LXCat, www.lxcat.net
+Generated on 04 Nov 2016. All rights reserved.
+
+RECOMMENDED REFERENCE FORMAT
+- Phelps database, www.lxcat.net, retrieved on November 4, 2016.
+Be aware that some databases and solvers can additionally have instructions how to reference corresponding data.
+Please check below in the headers of databases.
+
+CROSS SECTION DATA FORMAT
+In downloaded files, each collision process is defined by a block consisting of
+1st line
+Keyword in capitals indicating the type of the collision. Possible collision types are elastic, effective, excitation,
+ionization, or attachment (capital letters required, key words are case sensitive), where "elastic" is used to denote
+the elastic momentum transfer cross section and where "effective" denotes the total momentum transfer cross section (sum
+of elastic momentum transfer and total inelastic cross sections).  The latter is useful for solving the Boltzmann
+equation in the 2-term approximation.
+2nd line
+Name of the target particle species. This name is a character string, freely chosen by the user, e.g. "Ar". Optionally
+for excitation processes, the name of the corresponding excited state can be specified on the same line, separated from
+the first name either by arrow "->" (dash + greater than) or by double-head arrow "<->" (less than + dash +
+greater than), e.g. "Ar -> Ar*" and "Ar <-> Ar*", respectively. In the later case BOLSIG+ will automatically
+define the inverse superelastic process, constructing the superelastic cross-section by detailed balancing, and
+considering the indicated excited state as the target. In this case, the ratio of statistical weights must be input in
+the 3rd line (see below).  Alternatively, superelastic collisions could be defined explicitly as excitation collisions
+with a negative electron energy loss with user input cross sections and species name, "Ar*", for example.
+3rd line
+For elastic and effective collisions, the ratio of the electron mass to the target particle mass. For excitation or
+ionization collisions, the electron energy loss (nominally the threshold energy) in eV. For attachment, the 3rd line is
+missing. In case of an excitation process where an excited state has been indicated on the 2nd line using double-head
+arrow "<->", the 3rd line must specify also ratio of the statistical weights of the final state to the initial state
+as the second parameter in 3rd line this is needed by BOLSIG+ to calculate the de-excitation cross-section.
+from 4th line (optionally)
+User comments and reference information, maximum 100 lines. The only constraint on format is that these comment lines
+must not start with a number.
+Finally
+Table of the cross section as a function of energy. The table starts and ends by a line of dashes "------" (at least 5),
+and has otherwise two numbers per line: the energy in eV and the cross section in m2.
+
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+DATABASE:         Phelps database
+PERMLINK:         www.lxcat.net/Phelps
+DESCRIPTION:      A compilation of atomic and molecular data, assembled and evaluated by A.V. Phelps and collaborators.
+                  Please refer to these data using the sources cited for each gas. 
+                  
+                  We make no claims for these cross sections beyond those stated in the papers where they are published
+                  or cited.  In most cases these cross sections were assembled in the 1970's and 1980's. In only a few
+                  cases have they been modified or tested since that time. I do not plan any updates.  Additions have
+                  been made when cross sections have been assembled for other purposes. Since the JILA information
+                  center was closed by NIST, there is no one there to help you.  Opinions expressed are those of AV
+                  Phelps and do not imply JILA, CU, or NIST approval.
+CONTACT:          A.V. Phelps, Fellow Adjoint of JILA
+                  University of Colorado
+                  Boulder, CO 80309-0440
+                  e-mail: avp@@jila.colorado.edu
+HOW TO REFERENCE: http://jilawww.colorado.edu/~avp/
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+**************************************************************************************************************
+
+**************************************************************************************************************
+
+SPECIES: I^+ / I^-
+PROCESS: I+ + I- -> 2I, RECOMBINATION
+COLUMNS: Energy (eV) | Cross section (m2)
+-----------------------------
+1.000000e-04  2.867133e-15
+1.096986e-04  2.737457e-15
+1.203378e-04  2.613646e-15
+1.320088e-04  2.495435e-15
+1.448118e-04  2.382571e-15
+1.588565e-04  2.274811e-15
+1.742633e-04  2.171925e-15
+1.911644e-04  2.073692e-15
+2.097046e-04  1.979902e-15
+2.300430e-04  1.890355e-15
+2.523539e-04  1.804857e-15
+2.768287e-04  1.723226e-15
+3.036771e-04  1.645287e-15
+3.331295e-04  1.570874e-15
+3.654383e-04  1.499826e-15
+4.008806e-04  1.431991e-15
+4.397604e-04  1.367224e-15
+4.824109e-04  1.305387e-15
+5.291979e-04  1.246346e-15
+5.805226e-04  1.189976e-15
+6.368250e-04  1.136155e-15
+6.985880e-04  1.084769e-15
+7.663411e-04  1.035707e-15
+8.406653e-04  9.888633e-16
+9.221979e-04  9.441386e-16
+1.011638e-03  9.014367e-16
+1.109752e-03  8.606662e-16
+1.217383e-03  8.217397e-16
+1.335452e-03  7.845737e-16
+1.464971e-03  7.490887e-16
+1.607053e-03  7.152086e-16
+1.762914e-03  6.828609e-16
+1.933892e-03  6.519762e-16
+2.121452e-03  6.224884e-16
+2.327202e-03  5.943342e-16
+2.552908e-03  5.674534e-16
+2.800504e-03  5.417884e-16
+3.072113e-03  5.172842e-16
+3.370064e-03  4.938883e-16
+3.696913e-03  4.715505e-16
+4.055461e-03  4.502230e-16
+4.448783e-03  4.298602e-16
+4.880252e-03  4.104183e-16
+5.353567e-03  3.918557e-16
+5.872787e-03  3.741327e-16
+6.442364e-03  3.572113e-16
+7.067181e-03  3.410552e-16
+7.752597e-03  3.256298e-16
+8.504489e-03  3.109021e-16
+9.329304e-03  2.968405e-16
+1.023411e-02  2.834149e-16
+1.122668e-02  2.705965e-16
+1.231551e-02  2.583579e-16
+1.350994e-02  2.466728e-16
+1.482021e-02  2.355161e-16
+1.625756e-02  2.248641e-16
+1.783431e-02  2.146939e-16
+1.956398e-02  2.049836e-16
+2.146141e-02  1.957125e-16
+2.354286e-02  1.868608e-16
+2.582619e-02  1.784094e-16
+2.833096e-02  1.703402e-16
+3.107866e-02  1.626360e-16
+3.409285e-02  1.552802e-16
+3.739937e-02  1.482572e-16
+4.102658e-02  1.415517e-16
+4.500558e-02  1.351496e-16
+4.937048e-02  1.290370e-16
+5.415871e-02  1.232008e-16
+5.941134e-02  1.176287e-16
+6.517340e-02  1.123085e-16
+7.149429e-02  1.072290e-16
+7.842822e-02  1.023792e-16
+8.603464e-02  9.774873e-17
+9.437878e-02  9.332772e-17
+1.035322e-01  8.910665e-17
+1.135733e-01  8.507650e-17
+1.245883e-01  8.122863e-17
+1.366716e-01  7.755479e-17
+1.499268e-01  7.404711e-17
+1.644676e-01  7.069808e-17
+1.804186e-01  6.750052e-17
+1.979167e-01  6.444758e-17
+2.171118e-01  6.153272e-17
+2.381686e-01  5.874969e-17
+2.612675e-01  5.609254e-17
+2.866068e-01  5.355556e-17
+3.144035e-01  5.113333e-17
+3.448962e-01  4.882065e-17
+3.783463e-01  4.661258e-17
+4.150405e-01  4.450436e-17
+4.552935e-01  4.249150e-17
+4.994505e-01  4.056968e-17
+5.478901e-01  3.873478e-17
+6.010277e-01  3.698287e-17
+6.593188e-01  3.531019e-17
+7.232634e-01  3.371317e-17
+7.934097e-01  3.218838e-17
+8.703591e-01  3.073255e-17
+9.547716e-01  2.934256e-17
+1.047371e+00  2.801545e-17
+1.148951e+00  2.674835e-17
+1.260383e+00  2.553857e-17
+1.382622e+00  2.438350e-17
+1.516717e+00  2.328067e-17
+1.663817e+00  2.222773e-17
+1.825183e+00  2.122240e-17
+2.002200e+00  2.026255e-17
+2.196385e+00  1.934611e-17
+2.409404e+00  1.847111e-17
+2.643081e+00  1.763569e-17
+2.899423e+00  1.683806e-17
+3.180626e+00  1.607650e-17
+3.489101e+00  1.534939e-17
+3.827494e+00  1.465516e-17
+4.198707e+00  1.399233e-17
+4.605922e+00  1.335948e-17
+5.052631e+00  1.275525e-17
+5.542665e+00  1.217835e-17
+6.080224e+00  1.162754e-17
+6.669920e+00  1.110165e-17
+7.316807e+00  1.059954e-17
+8.026434e+00  1.012014e-17
+8.804884e+00  9.662422e-18
+9.658832e+00  9.225406e-18
+1.059560e+01  8.808156e-18
+1.162322e+01  8.409777e-18
+1.275051e+01  8.029417e-18
+1.398713e+01  7.666259e-18
+1.534368e+01  7.319527e-18
+1.683180e+01  6.988476e-18
+1.846425e+01  6.672399e-18
+2.025502e+01  6.370617e-18
+2.221947e+01  6.082484e-18
+2.437444e+01  5.807383e-18
+2.673842e+01  5.544725e-18
+2.933166e+01  5.293946e-18
+3.217642e+01  5.054509e-18
+3.529707e+01  4.825902e-18
+3.872039e+01  4.607634e-18
+4.247572e+01  4.399238e-18
+4.659526e+01  4.200268e-18
+5.111433e+01  4.010296e-18
+5.607170e+01  3.828917e-18
+6.150986e+01  3.655741e-18
+6.747544e+01  3.490398e-18
+7.401960e+01  3.332533e-18
+8.119845e+01  3.181808e-18
+8.907355e+01  3.037900e-18
+9.771242e+01  2.900501e-18
+1.071891e+02  2.769316e-18
+1.175850e+02  2.644064e-18
+1.289890e+02  2.524477e-18
+1.414991e+02  2.410299e-18
+1.552225e+02  2.301285e-18
+1.702769e+02  2.197202e-18
+1.867914e+02  2.097826e-18
+2.049075e+02  2.002945e-18
+2.247806e+02  1.912355e-18
+2.465811e+02  1.825862e-18
+2.704960e+02  1.743281e-18
+2.967302e+02  1.664435e-18
+3.255089e+02  1.589156e-18
+3.570786e+02  1.517281e-18
+3.917101e+02  1.448656e-18
+4.297005e+02  1.383136e-18
+4.713753e+02  1.320579e-18
+5.170920e+02  1.260851e-18
+5.672426e+02  1.203825e-18
+6.222571e+02  1.149378e-18
+6.826072e+02  1.097394e-18
+7.488104e+02  1.047760e-18
+8.214344e+02  1.000372e-18
+9.011018e+02  9.551265e-19
+9.884959e+02  9.119276e-19
+1.084366e+03  8.706826e-19
+1.189534e+03  8.313031e-19
+1.304902e+03  7.937046e-19
+1.431459e+03  7.578066e-19
+1.570290e+03  7.235322e-19
+1.722586e+03  6.908080e-19
+1.889652e+03  6.595639e-19
+2.072922e+03  6.297329e-19
+2.273966e+03  6.012511e-19
+2.494508e+03  5.740575e-19
+2.736440e+03  5.480938e-19
+3.001836e+03  5.233044e-19
+3.292971e+03  4.996361e-19
+3.612343e+03  4.770384e-19
+3.962689e+03  4.554627e-19
+4.347013e+03  4.348629e-19
+4.768612e+03  4.151947e-19
+5.231099e+03  3.964161e-19
+5.738442e+03  3.784869e-19
+6.294989e+03  3.613685e-19
+6.905514e+03  3.450244e-19
+7.575250e+03  3.294195e-19
+8.309942e+03  3.145204e-19
+9.115888e+03  3.002952e-19
+1.000000e+04  2.867133e-19
+-----------------------------
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
