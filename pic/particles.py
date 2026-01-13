@@ -9,9 +9,11 @@ from pic.functions import (
     max_vect3D_multiple_T,
     particle_to_grid,
     popout,
+    popout_weighted,
     max_vect,
     max_vect3D,
     numba_return_part_diag,
+    numba_return_part_diag_weighted,
     numba_interp1D_normed,
     remove,
     remove_array,
@@ -40,9 +42,10 @@ class ParticlesGroup:
         self.symbol = symbol
 
     def init_part(self) -> None:
+        qf :float = (self.plasma.density * self.plasma.Lx / self.plasma.Npart).si.value
         match self.start:
             case (T, n):
-                N = int(n.to_value(u.m**-3) * self.plasma.Lx / self.plasma.qf)
+                N = int(n.to_value(u.m**-3) * self.plasma.Lx / qf)
                 self.init_uniform(N, T.to_value(u.eV))
             case (x, n, T, v, T_inj):
                 x = x.to_value(u.m)
@@ -51,13 +54,13 @@ class ParticlesGroup:
                 if v is not None:
                     v = v.to_value(u.m / u.s)
                 n_l = np.trapz(n, x)
-                N = int(n_l / (self.plasma.qf))
+                N = int(n_l / qf)
                 self.init_with_profile(N, x, n, T, v)
                 if T_inj is not None:
                     self.T = T_inj.to_value(u.eV)
         self.E_interp = np.zeros(N, dtype="float64", order="F")
 
-    def init_uniform(self, N, T):
+    def init_uniform(self, N, T, qf):
         """Generate uniform particle, with maxwellian stuff"""
 
         self.x = np.linspace(0, self.plasma.Lx, N)
@@ -70,8 +73,9 @@ class ParticlesGroup:
         self.c = np.zeros_like(self.V)
         self.Npart = N
         self.T = T
+        self.w = np.ones(N, dtype="float64") * qf   #adding weight
 
-    def init_with_profile(self, N, x, n, T, v):
+    def init_with_profile(self, N, x, n, T, v, qf):
         cdf = cumulative_trapezoid(n, x, initial=0.0)
         cdf /= cdf[-1]
         self.x = np.interp(np.random.rand(N), cdf, x)
@@ -82,9 +86,12 @@ class ParticlesGroup:
         self.Npart = N
         self.T = np.mean(T)
 
-    def init_restart(self, N, x, V):
+        self.w = np.ones(N, dtype="float64") * qf   #adding weight
+
+    def init_restart(self, N, x, V, w):
         self.x = x
         self.V = V
+        self.w = w
         self.c = np.zeros_like(self.V)
         self.Npart = N
         self.E_interp = np.zeros(N, dtype="float64", order="F")
@@ -95,7 +102,7 @@ class ParticlesGroup:
                 if T_inj is not None:
                     self.T = T_inj.to_value(u.eV)
 
-    def add_particles(self, x: np.ndarray, V: np.ndarray) -> None:
+    def add_particles(self, x: np.ndarray, V: np.ndarray, w: np.ndarray) -> None:
         N = x.shape[0]
         if N > 0:
             while self.x.shape[0] <= self.Npart + N:
@@ -110,6 +117,10 @@ class ParticlesGroup:
                 new_E_interp = np.zeros((new_size), dtype="float64")
                 new_E_interp[: self.Npart] = self.E_interp[: self.Npart]
                 self.E_interp = new_E_interp
+                #adding weights
+                new_w = np.zeros((new_size), dtype="float64")
+                new_w[: self.Npart] = self.w[: self.Npart]
+                self.w = new_w
 
             # Fill the last elements with the new ones
             Nmin = self.Npart
@@ -119,6 +130,8 @@ class ParticlesGroup:
 
             self.V[Nmin:Nmax, :] = V
 
+            self.w[Nmin:Nmax] = w
+
             self.Npart += N
 
     def update_density(self, tabx):
@@ -126,21 +139,36 @@ class ParticlesGroup:
 
         self.n.fill(0)
         partx = self.x[: self.Npart]
-        return numba_return_part_diag(
-            self.Npart, partx, partx, tabx, self.n, self.plasma.dx, power=0
+        weight = self.w[: self.Npart]
+        #return numba_return_part_diag(
+        #   self.Npart, partx, partx, tabx, self.n, self.plasma.dx, power=0
+        #)
+
+        return numba_return_part_diag_weighted(
+           self.Npart, partx, partx, weight, tabx, self.n, self.plasma.dx, power=0
         )
 
     def update_u(self, tabx):
         self.u.fill(0)
         for k in range(3):
-            particle_to_grid(
+            numba_return_part_diag_weighted(
                 self.Npart,
                 self.x[: self.Npart],
                 self.V[: self.Npart, k],
+                self.w[: self.Npart],
                 tabx,
                 self.u[:, k],
-                self.plasma.dx,
-            )
+                self.plasma.dx, 
+                power=1
+            )            
+            # particle_to_grid(
+            #     self.Npart,
+            #     self.x[: self.Npart],
+            #     self.V[: self.Npart, k],
+            #     tabx,
+            #     self.u[:, k],
+            #     self.plasma.dx,
+            # )
             np.divide(self.u[:, k], self.n, where=self.n != 0, out=self.u[:, k])
 
     def update_c(self):
@@ -158,9 +186,12 @@ class ParticlesGroup:
         The boundary arguments will be used to differe between wall and center
         (mirror)
         """
-        (left, right) = popout(
-            self.x[: self.Npart], self.V[: self.Npart], Lx, absorbtion
-        )
+        (left, right) = popout_weighted(
+            self.x[: self.Npart], self.V[: self.Npart], self.w[: self.Npart], Lx, absorbtion
+        )        
+        # (left, right) = popout(
+        #     self.x[: self.Npart], self.V[: self.Npart], Lx, absorbtion
+        # )
         self.flux = (left, right)
         compt = left + right
         self.Npart -= compt
@@ -170,8 +201,10 @@ class ParticlesGroup:
     def remove_index(self, Idxs):
         if isinstance(Idxs, np.ndarray):
             self.Npart = remove_array(Idxs, self.x, self.V, self.Npart)
+            self.Npart = remove_array_weighted(Idxs, self.x, self.V, self.w, self.Npart)
         else:
             self.Npart = remove(Idxs, self.x, self.V, self.Npart)
+            self.Npart = remove_weighted(Idxs, self.x, self.V, self.w, self.Npart)
 
     def remove_random(self, N_random):
         self.Npart = remove_random(self.x, self.V, self.Npart, N_random)

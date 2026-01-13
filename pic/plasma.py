@@ -319,7 +319,7 @@ class Plasma:
         if self.wall is not None:
             self.wall.absorbtion()
 
-    def recombine(self, n_steps):
+    def recombine(self, n_steps):   #not used
         for s1, s2, k in self.recombination:
             p1 = self.species[s1]
             p2 = self.species[s2]

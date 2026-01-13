@@ -195,6 +195,24 @@ def particle_to_grid_order0(Np, partx, tabx, diag, dx):
     return diag
 
 
+def numba_return_part_diag_weighted(Np, partx, partv, weight, tabx, diag, dx, power):
+    """general function for the particle to grid diagnostics"""
+
+
+    sum_weights = np.sum(weight)
+    if power == 0:
+        return particle_to_grid(Np, partx, weight, tabx, diag, dx) / sum_weights
+    elif power == 1:
+        weighted_info = partv * weight
+        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx) / sum_weights
+    elif power > 0:
+        weighted_info = numba_power(partv, power) * weight
+        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx) / sum_weights
+
+    else:
+        print("Unknow dignostics !!")
+        return diag
+
 def numba_return_part_diag(Np, partx, partv, tabx, diag, dx, power):
     """general function for the particle to grid diagnostics"""
 
@@ -286,6 +304,75 @@ def numba_thomas_solver(di, ai, bi, ciprim, Nx):
 
 
 @njit
+def popout_weighted(x, V, w, val, absorbtion):
+    """move elements that do not correspond to the condition
+    x > val to the end of the table.
+
+    Inputs :
+    =========
+    x, v (In and out) : array of float64
+
+    val: float64 the threshold
+
+    return:
+    =======
+    compt: int64 number of elements put at the end of x
+
+    """
+    ## Init the parameters ##
+    compt = 0
+    left = 0
+    right = 0
+    N = len(x)
+    zeros = np.zeros(3)
+    ## Linear search from the end of the table ##
+    pos = x[-1]
+    if absorbtion:
+        if (pos >= val) or (pos <= 0):  # check for the last particle
+            x[-1] = -1
+            V[-1] = zeros
+            w[-1] = 0.0
+
+            compt += 1
+            if pos >= val:
+                right += 1
+            else:
+                left += 1
+
+        for i in np.arange(N - 2, -1, -1):
+            pos = x[i]
+            if (pos >= val) or (pos <= 0):  # Condition to move the element at the end
+                # exchange the current element with the last
+                tmp = x[-compt - 1]
+                x[-compt - 1] = -1
+                x[i] = tmp
+
+                V[i, :] = V[-compt - 1, :]
+                V[-compt - 1, :] = zeros
+                tmp = w[-compt - 1]
+                w[-compt - 1] = 0.0
+                w[i] = tmp
+
+                compt += 1
+                if pos >= val:
+                    right += 1
+                else:
+                    left += 1
+
+    else:
+        for i in range(len(x)):  # in case of reflection
+            pos = x[i]
+            if pos >= val:
+                x[i] = 2 * val - pos
+                V[i] = -V[i]
+
+            if pos <= 0:
+                x[i] = -x[i]
+                V[i] = -V[i]
+
+    return (left, right)
+
+@njit
 def popout(x, V, val, absorbtion):
     """move elements that do not correspond to the condition
     x > val to the end of the table.
@@ -313,6 +400,7 @@ def popout(x, V, val, absorbtion):
         if (pos >= val) or (pos <= 0):  # check for the last particle
             x[-1] = -1
             V[-1] = zeros
+            
             compt += 1
             if pos >= val:
                 right += 1
@@ -396,6 +484,11 @@ def remove(Idxs, x, V, Npart):
     return __remove_jit(Idxs, x, V, Npart)
 
 
+def remove_array_weighted(Idxs, x, V, w, Npart):
+    Idxs.sort()
+    Idxs = Idxs[::-1]
+    return __remove_jit_weighted(Idxs, x, V, w, Npart)
+
 def remove_array(Idxs, x, V, Npart):
     Idxs.sort()
     Idxs = Idxs[::-1]
@@ -412,6 +505,18 @@ def __remove_jit(Idxs, x, V, Npart):
         Npart -= 1
     return Npart
 
+
+@njit()
+def __remove_jit_weighted(Idxs, x, V, w, Npart):
+    for i in Idxs:
+        x[i] = x[Npart - 1]
+        V[i, :] = V[Npart - 1, :]
+        w[i] = w[Npart - 1]
+        x[Npart - 1] = -1.0
+        V[Npart - 1, :] = 0.0
+        w[Npart - 1] = 0.0
+        Npart -= 1
+    return Npart
 
 @njit()
 def fixed_angle_isotropic_scatter(
