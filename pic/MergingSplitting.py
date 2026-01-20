@@ -364,3 +364,72 @@ class DynamicMerging:
             specie.V = np.array(v_new, dtype=float)
             specie.w = np.array(w_new, dtype=float)
             specie.Npart = specie.w.size
+
+class DynamicSplitting:
+    def __init__(self, plasma, w_max, split_factor=2, split_interval=100):
+        """
+        w_max        : target maximum macro-weight (above this, particles are candidates)
+        split_factor : number of children per split parent
+        split_interval : how often we attempt splitting
+        """
+        self.plasma = plasma
+        self.w_max = w_max
+        self.split_factor = split_factor
+        self.split_interval = split_interval
+
+    def execute(self, nt: int):
+        """
+        Perform dynamic splitting at timestep nt.
+
+        For each species:
+          - identify particles whose weight exceeds w_max,
+          - replace each with 'split_factor' children of smaller weight,
+          - children share the same position and velocity (simple version),
+            or can be randomly perturbed to better sample the local VDF.
+        """
+        if nt % self.split_interval != 0:
+            return
+
+        for specie in self.plasma.species.values():
+            x = specie.x
+            v = specie.V      # shape (Npart, 3)
+            w = specie.w
+            Npart = specie.Npart
+
+            # indices of over-weighted particles
+            heavy = np.where(w > self.w_max)[0]
+            if heavy.size == 0:
+                continue
+
+            x_new = []
+            v_new = []
+            w_new = []
+
+            for i in range(Npart):
+                if i not in heavy:
+                    # keep original particle as is
+                    x_new.append(x[i])
+                    v_new.append(v[i])
+                    w_new.append(w[i])
+                else:
+                    # split particle i into 'split_factor' children
+                    w_child = w[i] / self.split_factor
+                    for _ in range(self.split_factor):
+                        # simplest version: identical clones
+                        x_child = x[i]
+                        v_child = v[i].copy()
+
+                        # optional: add a tiny random perturbation to v_child
+                        # to improve sampling of the local VDF without biasing
+                        # mean or energy too much (tunable parameter epsilon)
+                        # epsilon = 1e-3
+                        # v_child += epsilon * np.linalg.norm(v[i]) * np.random.randn(3)
+
+                        x_new.append(x_child)
+                        v_new.append(v_child)
+                        w_new.append(w_child)
+
+            specie.x = np.asarray(x_new, dtype=float)
+            specie.V = np.asarray(v_new, dtype=float)
+            specie.w = np.asarray(w_new, dtype=float)
+            specie.Npart = specie.w.size
