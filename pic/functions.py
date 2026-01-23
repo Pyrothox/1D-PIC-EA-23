@@ -194,6 +194,51 @@ def particle_to_grid_order0(Np, partx, tabx, diag, dx):
 
     return diag
 
+@njit(
+        "i8[:,:](i8, f8[:], f8[:], i8[:,:], f8)",
+        fastmath=fastmath,
+        parallel=numbaparallel,
+)
+def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
+    """Spatially bin particles into cells and return their indexes.
+    Groups all particles into their respective spatial cells based on position.
+    Useful for cell-by-cell operations like local clustering, merging, or diagnostics.
+    Particles outside domain bounds are clamped to nearest boundary cell.
+
+    Parameters
+    ----------
+    Np : int
+        Total number of particles
+    partx : array, shape (Npart,)
+        Particle x-positions [m]
+    tabx : array, shape (Ncells,)
+        Grid cell positions/boundaries
+    cells_indexes : array, shape (Ncells, ?)
+        Output array to store particle indexes per cell
+    dx : float
+        Grid spacing [m]
+    
+    Returns
+    -------
+    list of lists
+        cells_indexes[j] contains sorted list of all particle indexes in cell j.
+        Empty lists for cells with no particles.
+    """
+
+    Ncells = len(tabx) - 1
+    cells_indexes = [[] for _ in range(Ncells)]
+    
+    for i in range(Np):
+        j = int(partx[i] / dx)
+        # Clamp to valid cell range
+        if j >= Ncells:
+            j = Ncells - 1
+        elif j < 0:
+            j = 0
+        cells_indexes[j].append(i)
+    
+    return cells_indexes
+
 
 def numba_return_part_diag_weighted(Np, partx, partv, weight, tabx, diag, dx, power):
     """general function for the particle to grid diagnostics"""
