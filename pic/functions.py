@@ -483,6 +483,11 @@ def remove(Idxs, x, V, Npart):
     Idxs.reverse()
     return __remove_jit(Idxs, x, V, Npart)
 
+def remove_weighted(Idxs, x, V, w, Npart):
+    Idxs.sort()
+    Idxs.reverse()
+    return __remove_jit_weighted(Idxs, x, V, w, Npart)
+
 
 def remove_array_weighted(Idxs, x, V, w, Npart):
     Idxs.sort()
@@ -610,6 +615,52 @@ def remove_random(x, V, Npart, N_remove):
         V[i, :] = V[Npart - 1, :]
         x[Npart - 1] = -1.0
         V[Npart - 1, :] = 0.0
+        Npart -= 1
+    return Npart
+
+
+@njit
+def remove_random_weighted(x, V, w, Npart, N_remove):
+    """Remove particles with probability proportional to their weight.
+    
+    Parameters
+    ----------
+    x : np.array(N)
+        Particle positions
+    V : np.array(N,3)
+        Particle velocities
+    w : np.array(N)
+        Particle weights
+    Npart : int
+        Number of active particles
+    N_remove : int
+        Number of particles to remove
+        
+    Returns
+    -------
+    Npart : int
+        Updated number of particles
+    """
+    for _ in range(N_remove):
+        # Compute cumulative sum of weights
+        cumsum = np.cumsum(w[:Npart])
+        total = cumsum[-1]
+        
+        # Generate random number and find particle index
+        rand_val = np.random.random() * total
+        i = np.searchsorted(cumsum, rand_val)
+        if i >= Npart:
+            i = Npart - 1
+        
+        # Remove particle by swapping with last active particle
+        x[i] = x[Npart - 1]
+        V[i, :] = V[Npart - 1, :]
+        w[i] = w[Npart - 1]
+        
+        x[Npart - 1] = -1.0
+        V[Npart - 1, :] = 0.0
+        w[Npart - 1] = 0.0
+        
         Npart -= 1
     return Npart
 

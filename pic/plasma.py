@@ -13,6 +13,7 @@ from pic.functions import (
     numba_interp1D_normed_buff,
     numba_return_part_diag,
     particle_to_grid_order0,
+    particle_to_grid,
 )
 from pic.parsing import excitation_function
 from pic.MCC import MCC, ProfileGas, inter_species_mcc_factory, mcc_factory
@@ -87,7 +88,7 @@ class Plasma:
                 )
         if density is None:
             raise ValueError("No density given nor electron population")
-        self.qf: float = (density * Lx / Npart).si.value
+        self.initial_qf: float = (density * Lx / Npart).si.value
         # particles
         self.species: Dict[particles.ParticleLike, ParticlesGroup] = {}
         self.part_out: Dict[particles.ParticleLike, int] = {}
@@ -323,7 +324,7 @@ class Plasma:
         for s1, s2, k in self.recombination:
             p1 = self.species[s1]
             p2 = self.species[s2]
-            N = k * self.qf * p1.Npart * p2.Npart * self.dT * n_steps / self.Lx
+            N = k * self.initial_qf * p1.Npart * p2.Npart * self.dT * n_steps / self.Lx #no changes needed, function depreciated
             part = N - np.floor(N)
             N = int(N) + (1 if np.random.rand() < part else 0)
             if N:
@@ -336,7 +337,8 @@ class Plasma:
         for part in self.species.values():
             self.rho += part.update_density(self.x_j) * part.charge
 
-        self.rho *= self.qf / self.dx
+        # self.rho *= self.qf / self.dx #TODO
+        self.rho *= 1/self.dx   #update_density is now weighted
 
     def solve_poisson(self, nt: int):
         """solve poisson via the Thomas method"""
@@ -363,7 +365,8 @@ class Plasma:
                 numba_return_part_diag(
                     part.Npart,
                     part.x[: part.Npart],
-                    part.V[: part.Npart, 2] * (phase * part.charge * self.qf),
+                    # part.V[: part.Npart, 2] * (phase * part.charge * self.qf), #TODO
+                    part.V[: part.Npart, 2] * (phase * part.charge * part.w[: part.Npart]),
                     self.x_j,
                     self.Jz,
                     self.dx,
@@ -406,7 +409,15 @@ class Plasma:
     def fake_ionization(self, specie: particles.ParticleLike):
         elecs = self.species[particles.electron]
         ions = self.species[specie]
-        x = np.random.choice(elecs.x[: elecs.Npart], self.part_out[specie])
+
+        N = self.part_out[specie]
+        indices = np.random.choice(elecs.Npart, N)
+
+        # x = np.random.choice(elecs.x[: elecs.Npart], self.part_out[specie])
+
+        x = elecs.x[indices]
+        w = elecs.w[indices]
+
         v_elecs = max_vect3D(len(x), elecs.T, elecs.m)
         v_ions = max_vect3D(len(x), ions.T, ions.m)
         elecs.add_particles(x, v_elecs)
@@ -414,9 +425,14 @@ class Plasma:
         self.part_out[specie] = 0
         self.part_out[particles.electron] -= len(x)
         if self.inj_diag:
-            particle_to_grid_order0(
-                x.shape[0], x, self.x_j, self.diag_values["inj"], self.dx
+            #particle_to_grid_order0(
+            #    x.shape[0], x, self.x_j, self.diag_values["inj"], self.dx
+            #)
+            particle_to_grid(
+                x.shape[0], x, w, self.x_j, self.diag_values["inj"], self.dx
             )
+    
+
 
     def change_neutral_profile(
         self, gas: particles.ParticleLike, x: np.ndarray, n: np.ndarray, T: np.ndarray

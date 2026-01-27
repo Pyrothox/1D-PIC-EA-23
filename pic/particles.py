@@ -17,7 +17,10 @@ from pic.functions import (
     numba_interp1D_normed,
     remove,
     remove_array,
+    remove_array_weighted,
+    remove_weighted,
     remove_random,
+    remove_random_weighted,
     find_cells,
     random_round,
 )
@@ -42,11 +45,10 @@ class ParticlesGroup:
         self.symbol = symbol
 
     def init_part(self) -> None:
-        qf :float = (self.plasma.density * self.plasma.Lx / self.plasma.Npart).si.value
         match self.start:
             case (T, n):
-                N = int(n.to_value(u.m**-3) * self.plasma.Lx / qf)
-                self.init_uniform(N, T.to_value(u.eV))
+                N = int(n.to_value(u.m**-3) * self.plasma.Lx / self.plasma.initial_qf)
+                self.init_uniform(N, T.to_value(u.eV), self.plasma.initial_qf)
             case (x, n, T, v, T_inj):
                 x = x.to_value(u.m)
                 n = n.to_value(u.m**-3)
@@ -54,7 +56,7 @@ class ParticlesGroup:
                 if v is not None:
                     v = v.to_value(u.m / u.s)
                 n_l = np.trapz(n, x)
-                N = int(n_l / qf)
+                N = int(n_l / self.plasma.initial_qf)
                 self.init_with_profile(N, x, n, T, v)
                 if T_inj is not None:
                     self.T = T_inj.to_value(u.eV)
@@ -200,15 +202,18 @@ class ParticlesGroup:
 
     def remove_index(self, Idxs):
         if isinstance(Idxs, np.ndarray):
-            self.Npart = remove_array(Idxs, self.x, self.V, self.Npart)
+            # self.Npart = remove_array(Idxs, self.x, self.V, self.Npart)
             self.Npart = remove_array_weighted(Idxs, self.x, self.V, self.w, self.Npart)
         else:
-            self.Npart = remove(Idxs, self.x, self.V, self.Npart)
+            # self.Npart = remove(Idxs, self.x, self.V, self.Npart)
             self.Npart = remove_weighted(Idxs, self.x, self.V, self.w, self.Npart)
 
     def remove_random(self, N_random):
-        self.Npart = remove_random(self.x, self.V, self.Npart, N_random)
+        # self.Npart = remove_random(self.x, self.V, self.Npart, N_random)
+        self.Npart = remove_random_weighted(self.x, self.V, self.w, self.Npart, N_random)
 
+
+    # MCC methods are considred not impacted by the addition of weights
     def add_mcc(self, mcc):
         self.mccs.append(mcc)
 
@@ -223,10 +228,11 @@ class ParticlesGroup:
 
     def coarse_sort(self):
         """sort the particles by cell and updaite the indexes in self.cells"""
-        # coarse_buble_sort(self.x, self.V, self.Npart, self.cells, self.plasma.dx)
+        #coarse_buble_sort(self.x, self.V, self.Npart, self.cells, self.plasma.dx)
         p = (self.x[: self.Npart] / self.plasma.dx).astype(int).argsort(kind="stable")
         self.x[: self.Npart] = self.x[p]
         self.V[: self.Npart] = self.V[p]
+        self.w[: self.Npart] = self.w[p]
         find_cells(self.x[: self.Npart], self.cells, self.plasma.dx)
 
     def partners(self, x):
@@ -251,7 +257,9 @@ class ParticlesGroup:
             2 * self.m
         )
 
-        self.add_particles(x_temp, v_temp)
+        w_temp = np.ones(N, dtype="float64") * self.plasma.initial_qf
+
+        self.add_particles(x_temp, v_temp, w_temp)
 
     def inject_maxwellian_flux(self, n0, T0):
         N = random_round(
@@ -262,8 +270,8 @@ class ParticlesGroup:
         v_temp[:, 2] = max_vect(N, T0, self.m)
         v_temp[:, 0] = np.sqrt(-e * T0 * np.log(np.random.rand(N)) / self.m)
         x_temp = np.random.rand(N) * v_temp[:, 0] * self.plasma.dT
-
-        self.add_particles(x_temp, v_temp)
+        w_temp = np.ones(N, dtype="float64") * self.plasma.initial_qf
+        self.add_particles(x_temp, v_temp, w_temp)
 
     def boris_push(self, E, Bz, dT):
         factor = self.charge * dT / (2 * self.m)
