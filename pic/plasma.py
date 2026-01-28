@@ -89,6 +89,8 @@ class Plasma:
         if density is None:
             raise ValueError("No density given nor electron population")
         self.initial_qf: float = (density * Lx / Npart).si.value
+        # historical name compatibility: qf is used across diagnostics and MCC
+        self.qf: float = self.initial_qf
         # particles
         self.species: Dict[particles.ParticleLike, ParticlesGroup] = {}
         self.part_out: Dict[particles.ParticleLike, int] = {}

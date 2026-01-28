@@ -268,7 +268,7 @@ class Measure_J(ParticleMeasure):
         particle_to_grid(
             self.particles.Npart,
             self.particles.x,
-            self.particles.V[:, 0],
+            self.particles.V[:, 0] * self.particles.w,
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
@@ -295,7 +295,8 @@ class Measure_P(ParticleMeasure):
                 self.particles.Npart,
                 self.particles.x,
                 self.particles.c[: self.particles.Npart, i]
-                * self.particles.c[: self.particles.Npart, j],
+                * self.particles.c[: self.particles.Npart, j]
+                * self.particles.w,
                 self.plasma.x_j,
                 self.values[:, k],
                 self.plasma.dx,
@@ -318,7 +319,7 @@ class Measure_q(ParticleMeasure):
             particle_to_grid(
                 self.particles.Npart,
                 self.particles.x,
-                self.particles.c[: self.particles.Npart, k] * c_square,
+                self.particles.c[: self.particles.Npart, k] * c_square * self.particles.w,
                 self.plasma.x_j,
                 self.values[:, k],
                 self.plasma.dx,
@@ -340,7 +341,7 @@ class Measure_E(ParticleMeasure):
         particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart],
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
@@ -361,7 +362,8 @@ class Measure_PowerDensity(ParticleMeasure):
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
             self.particles.V[: self.particles.Npart, 0]
-            * self.particles.E_interp[: self.particles.Npart],
+            * self.particles.E_interp[: self.particles.Npart]
+            * self.particles.w[: self.particles.Npart],
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
@@ -501,9 +503,17 @@ class MeasureLossesYZ(ParticleMeasure):
         plasma.wall.add_diagnostic(self, self.particles)
 
     def accumulate(self, x: np.ndarray):
-        particle_to_grid_order0(
-            x.shape[0], x, self.plasma.x_j, self.values, self.plasma.dx
-        )
+        # x can be positions array; support optional weights in wall diagnostics
+        if x.ndim == 2:
+            # assume (positions, weights) tuple-like provided
+            pos, w = x
+            particle_to_grid(
+                pos.shape[0], pos, w, self.plasma.x_j, self.values, self.plasma.dx
+            )
+        else:
+            particle_to_grid(
+                x.shape[0], x, np.ones_like(x), self.plasma.x_j, self.values, self.plasma.dx
+            )
 
     def average(self, N_average):
         self.values *= self.plasma.qf / (self.plasma.dx * self.plasma.dT * N_average)
@@ -519,7 +529,8 @@ class Measure_Ed(ParticleMeasure):
         e = particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1)
+            * self.particles.w[: self.particles.Npart],
             self.plasma.x_j,
             np.zeros_like(self.values),
             self.plasma.dx,
@@ -541,7 +552,8 @@ class Measure_T(ParticleMeasure):
         e = particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1)
+            * self.particles.w[: self.particles.Npart],
             self.plasma.x_j,
             np.zeros_like(self.values),
             self.plasma.dx,
@@ -636,9 +648,11 @@ class CollisionRate(ParticleMeasure):
     def before(self, I_coll: np.ndarray, mcc: MCC | InterspeciesMCC, collision):
         buffer = self.values[mcc.target_symbol()].get(collision.name)
         if buffer is not None:
-            particle_to_grid_order0(
+            # use particle weights for collision diagnostics
+            particle_to_grid(
                 I_coll.shape[0],
                 self.particles.x[I_coll],
+                self.particles.w[I_coll],
                 self.plasma.x_j,
                 buffer,
                 self.plasma.dx,
@@ -687,7 +701,7 @@ class CollisionMomentumTransfer(CollisionRate):
         particle_to_grid(
             I_coll.shape[0],
             x,
-            vi - self.particles.V[I_coll, 0],
+            (vi - self.particles.V[I_coll, 0]) * self.particles.w[I_coll],
             self.plasma.x_j,
             self.current,
             self.plasma.dx,
@@ -726,7 +740,7 @@ class CollisionEnergyTransfer(CollisionRate):
         particle_to_grid(
             I_coll.shape[0],
             x,
-            vi2 - np.sum(np.square(self.particles.V[I_coll]), axis=1),
+            (vi2 - np.sum(np.square(self.particles.V[I_coll]), axis=1)) * self.particles.w[I_coll],
             self.plasma.x_j,
             self.current,
             self.plasma.dx,
