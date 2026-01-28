@@ -1,9 +1,9 @@
 import numpy as np
-from functions import get_particle_indexes_in_cells
+from pic.functions import get_particle_indexes_in_cells
 
 
 class DPMSA:
-    def __init__(self, plasma, cluster_size_min=4, merge_interval=100):
+    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000):
         self.plasma = plasma
         self.N_min = cluster_size_min
         self.merge_interval = merge_interval
@@ -41,28 +41,31 @@ class DPMSA:
         centers = np.array(centers, dtype=int)
 
         # assign particles to nearest center
-        clusters = {c: [] for c in centers}
+        clusters = {int(c): [] for c in centers}
         for i in indices:
             dists = [self.distance(x[i], x[c], p[i], p[c]) for c in centers]
-            c_near = centers[int(np.argmin(dists))]
+            c_near = int(centers[int(np.argmin(dists))])
             clusters[c_near].append(int(i))
 
         # enforce minimum cluster size
         for c in list(clusters.keys()):
             if len(clusters[c]) < self.N_min:
                 # move this cluster to nearest other center
-                other_centers = [oc for oc in centers if oc != c]
+                # only consider other centers that still exist in clusters
+                other_centers = [int(oc) for oc in centers if int(oc) != int(c) and int(oc) in clusters]
                 if not other_centers:
                     continue
                 dmin = np.inf
                 best = None
                 for oc in other_centers:
-                    d = self.distance(x[c], x[oc], p[c], p[oc])
+                    oc = int(oc)
+                    d = self.distance(x[int(c)], x[int(oc)], p[int(c)], p[int(oc)])
                     if d < dmin:
                         dmin = d
-                        best = oc
-                clusters[best].extend(clusters[c])
-                del clusters[c]
+                        best = int(oc)
+                if best is not None and best in clusters:
+                    clusters[best].extend(clusters[c])
+                    del clusters[c]
 
         centers_after = np.array(list(clusters.keys()), dtype=int)
 
@@ -217,8 +220,9 @@ class DPMSA:
 
     # ---------- public entry ----------
     def execute(self, nt):
-        if nt % self.merge_interval != 0:
+        if nt - 10 % self.merge_interval != 0:
             return
+        print(f"DPMSA executing at nt={nt}")
         tabx = self.plasma.x_j
         dx = self.plasma.dx
         Ncells = self.plasma.N_cells
@@ -237,6 +241,7 @@ class DPMSA:
 
             x_new_all, p_new_all, w_new_all = [], [], []
             for icell in range(Ncells):
+                print(f"DPMSA processing cell {icell+1}/{Ncells}, nt={nt}")
                 idx = cells_indexes[icell]
                 if not idx:
                     continue

@@ -322,11 +322,11 @@ class Ionization_e(CollisionType):
         self.mcc.particles.V[Idxs] = v_inc
 
         # secondary electron
-        self.mcc.particles.add_particles(self.mcc.particles.x[Idxs], v_sec)
+        self.mcc.particles.add_particles(self.mcc.particles.x[Idxs], v_sec, self.mcc.particles.w[Idxs])
 
         # created ion
         x_ions = self.mcc.particles.x[Idxs]
-        self.product_parts.add_particles(x_ions, self.mcc.neutral.generate_v(x_ions))
+        self.product_parts.add_particles(x_ions, self.mcc.neutral.generate_v(x_ions), self.mcc.particles.w[Idxs])
 
 
 class DissociativeAttachment(CollisionType):
@@ -363,6 +363,7 @@ class DissociativeAttachment(CollisionType):
         energy = v_squared * self.mcc.particles.m / 2 + self.de
 
         x_ions = self.mcc.particles.x[Idxs]
+        w_ions = self.mcc.particles.w[Idxs]
 
         v_ion = self.mcc.neutral.generate_v(x_ions)
 
@@ -373,7 +374,7 @@ class DissociativeAttachment(CollisionType):
         v_ion += v_n
 
         # created ion
-        self.product_parts.add_particles(x_ions, v_ion)
+        self.product_parts.add_particles(x_ions, v_ion, self.mcc.particles.w[Idxs])
         self.mcc.particles.V[Idxs] = 0
         self.mcc.to_remove.extend(Idxs)
 
@@ -412,8 +413,9 @@ class DissociativeIonization(CollisionType):
         self.mcc.particles.V[Idxs] = v_inc
 
         x_ions = self.mcc.particles.x[Idxs]
+        w_ions = self.mcc.particles.w[Idxs]
         # secondary electron
-        self.mcc.particles.add_particles(x_ions, v_sec)
+        self.mcc.particles.add_particles(x_ions, v_sec, self.mcc.particles.w[Idxs])
 
         # created ion
 
@@ -427,7 +429,7 @@ class DissociativeIonization(CollisionType):
         v_ion += v_n
 
         # created ion
-        self.product_parts.add_particles(x_ions, v_ion)
+        self.product_parts.add_particles(x_ions, v_ion, self.mcc.particles.w[Idxs])
 
 
 class Isotropic_i(IonCollision):
@@ -536,7 +538,7 @@ class ChargeExchange(IonCollision):
         v_new_i = v_com + momentum_change[:, None] * v_rel_unit / mt
         # v_new_t = v_com - momentum_change * v_rel_unit/mi
 
-        self.product.add_particles(self.mcc.particles.x[Idxs], v_new_i)
+        self.product.add_particles(self.mcc.particles.x[Idxs], v_new_i, self.mcc.particles.w[Idxs])
         self.mcc.particles.V[Idxs] = 0
         self.mcc.to_remove.extend(Idxs)
 
@@ -676,6 +678,6 @@ class Detachment(InterspeciesCollision):
         self.mcc.impacter.V[I_arr] = v_inc
 
         # secondary electron
-        self.mcc.impacter.add_particles(self.mcc.impacter.x[I_arr], v_sec)
+        self.mcc.impacter.add_particles(self.mcc.impacter.x[I_arr], v_sec, self.mcc.impacter.w[I_arr])
 
         self.mcc.to_remove_target.extend(J_arr)

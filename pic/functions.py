@@ -194,11 +194,6 @@ def particle_to_grid_order0(Np, partx, tabx, diag, dx):
 
     return diag
 
-@njit(
-        "i8[:,:](i8, f8[:], f8[:], i8[:,:], f8)",
-        fastmath=fastmath,
-        parallel=numbaparallel,
-)
 def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
     """Spatially bin particles into cells and return their indexes.
     Groups all particles into their respective spatial cells based on position.
@@ -225,7 +220,7 @@ def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
         Empty lists for cells with no particles.
     """
 
-    Ncells = len(tabx) - 1
+    Ncells = int(1.0 / dx)
     cells_indexes = [[] for _ in range(Ncells)]
     
     for i in range(Np):
@@ -243,8 +238,10 @@ def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
 def numba_return_part_diag_weighted(Np, partx, partv, weight, tabx, diag, dx, power):
     """general function for the particle to grid diagnostics"""
 
-
     sum_weights = np.sum(weight)
+    if sum_weights == 0:
+        return diag
+    
     if power == 0:
         return particle_to_grid(Np, partx, weight, tabx, diag, dx) / sum_weights
     elif power == 1:
@@ -528,6 +525,11 @@ def remove(Idxs, x, V, Npart):
     Idxs.reverse()
     return __remove_jit(Idxs, x, V, Npart)
 
+def remove_weighted(Idxs, x, V, w, Npart):
+    Idxs.sort()
+    Idxs.reverse()
+    return __remove_jit_weighted(Idxs, x, V, w, Npart)
+
 
 def remove_array_weighted(Idxs, x, V, w, Npart):
     Idxs.sort()
@@ -655,6 +657,52 @@ def remove_random(x, V, Npart, N_remove):
         V[i, :] = V[Npart - 1, :]
         x[Npart - 1] = -1.0
         V[Npart - 1, :] = 0.0
+        Npart -= 1
+    return Npart
+
+
+@njit
+def remove_random_weighted(x, V, w, Npart, N_remove):
+    """Remove particles with probability proportional to their weight.
+    
+    Parameters
+    ----------
+    x : np.array(N)
+        Particle positions
+    V : np.array(N,3)
+        Particle velocities
+    w : np.array(N)
+        Particle weights
+    Npart : int
+        Number of active particles
+    N_remove : int
+        Number of particles to remove
+        
+    Returns
+    -------
+    Npart : int
+        Updated number of particles
+    """
+    for _ in range(N_remove):
+        # Compute cumulative sum of weights
+        cumsum = np.cumsum(w[:Npart])
+        total = cumsum[-1]
+        
+        # Generate random number and find particle index
+        rand_val = np.random.random() * total
+        i = np.searchsorted(cumsum, rand_val)
+        if i >= Npart:
+            i = Npart - 1
+        
+        # Remove particle by swapping with last active particle
+        x[i] = x[Npart - 1]
+        V[i, :] = V[Npart - 1, :]
+        w[i] = w[Npart - 1]
+        
+        x[Npart - 1] = -1.0
+        V[Npart - 1, :] = 0.0
+        w[Npart - 1] = 0.0
+        
         Npart -= 1
     return Npart
 

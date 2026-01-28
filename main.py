@@ -7,6 +7,7 @@ import argparse
 
 import pickle
 from pic.plasma import Plasma
+from pic.MergingSplitting import DPMSA
 
 from pic.parsing import get_parameters
 
@@ -114,6 +115,9 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
     ## Create files and save parameters ##
 
     print("~~~~ Data File Name: ", dataFileName)
+    
+    ## Initialize merging-splitting algorithm ##
+    dpmsa = DPMSA(pla)
 
     ## Do loops ##
 
@@ -145,12 +149,12 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
                 pla.boundary()
                 pla.apply_mcc()
                 pla.inject()
-                # pla.merge(nt)
+                dpmsa.execute(nt)
                 pla.compute_rho()
                 pla.solve_poisson(nt)
                 pla.diags(nt)
                 
-
+        
             pla.diagnostics.average_diags(parameters["n_average"])
             if pla.wall is not None:
                 pla.wall.update()
