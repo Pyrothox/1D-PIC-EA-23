@@ -194,11 +194,6 @@ def particle_to_grid_order0(Np, partx, tabx, diag, dx):
 
     return diag
 
-@njit(
-        "i8[:,:](i8, f8[:], f8[:], i8[:,:], f8)",
-        fastmath=fastmath,
-        parallel=numbaparallel,
-)
 def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
     """Spatially bin particles into cells and return their indexes.
     Groups all particles into their respective spatial cells based on position.
@@ -225,7 +220,7 @@ def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
         Empty lists for cells with no particles.
     """
 
-    Ncells = len(tabx) - 1
+    Ncells = int(1.0 / dx)
     cells_indexes = [[] for _ in range(Ncells)]
     
     for i in range(Np):
@@ -243,8 +238,10 @@ def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
 def numba_return_part_diag_weighted(Np, partx, partv, weight, tabx, diag, dx, power):
     """general function for the particle to grid diagnostics"""
 
-
     sum_weights = np.sum(weight)
+    if sum_weights == 0:
+        return diag
+    
     if power == 0:
         return particle_to_grid(Np, partx, weight, tabx, diag, dx) / sum_weights
     elif power == 1:
