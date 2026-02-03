@@ -261,4 +261,6 @@ class DPMSA:
             specie.x[:n_new] = x_new_all
             specie.V[:n_new, :] = p_new_all
             specie.w[:n_new] = w_new_all
+            print(f"ancien nb de macroparticules :  {specie.Npart}")
+            print(f"nouveau nb de macroparticules : {n_new}")
             specie.Npart = n_new

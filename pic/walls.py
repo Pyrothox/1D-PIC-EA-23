@@ -40,7 +40,7 @@ class AbstractWall:
             if len(Idxs) > 0:
                 removed_ions += len(Idxs)
                 if diag:
-                    diag.accumulate(ions.x[Idxs])
+                    diag.accumulate(ions.x[Idxs], ions.w[Idxs])
                 ions.remove_index(Idxs)
         if removed_ions:
             Idxs = np.argpartition(
@@ -48,7 +48,7 @@ class AbstractWall:
                 self.electrons.Npart - removed_ions,
             )[-removed_ions:]
             if self.elec_diag:
-                self.elec_diag.accumulate(self.electrons.x[Idxs])
+                self.elec_diag.accumulate(self.electrons.x[Idxs], self.electrons.w[Idxs])
             self.electrons.remove_index(Idxs)
 
     def update(self):

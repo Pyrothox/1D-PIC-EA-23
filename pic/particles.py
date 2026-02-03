@@ -188,14 +188,15 @@ class ParticlesGroup:
         The boundary arguments will be used to differe between wall and center
         (mirror)
         """
-        (left, right) = popout_weighted(
+        left_count, right_count, left_w, right_w = popout_weighted(
             self.x[: self.Npart], self.V[: self.Npart], self.w[: self.Npart], Lx, absorbtion
         )        
         # (left, right) = popout(
         #     self.x[: self.Npart], self.V[: self.Npart], Lx, absorbtion
         # )
-        self.flux = (left, right)
-        compt = left + right
+        # store actual removed weights as flux (physical units)
+        self.flux = (left_w, right_w)
+        compt = left_count + right_count
         self.Npart -= compt
 
         return compt
