@@ -144,21 +144,24 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
         # entire cycle duration Nt
         for avg_nt in range(t0, parameters["Nt"], parameters["n_average"]):
             # average cycle duration n_average
-            cycle = 0
             for nt in range(avg_nt, avg_nt + parameters["n_average"]):
                 pla.pusher()
                 pla.boundary()
                 pla.apply_mcc()
                 pla.inject()
-                dpmsa.execute(nt)
+                # dpmsa.execute(nt)
                 pla.compute_rho()
                 pla.solve_poisson(nt)
                 pla.diags(nt)
                 
-            cycle +=1
             pla.diagnostics.average_diags(parameters["n_average"])
             if pla.wall is not None:
                 pla.wall.update()
+            pla.diagnostics.save_diags(nt, dataFileName)
+            dpmsa.execute(10)
+            pla.compute_rho()
+            pla.solve_poisson(12800)
+            pla.diags(12800)
             pla.diagnostics.save_diags(nt, dataFileName)
 
             # pla.recombine(pla.diagnostics.average)
