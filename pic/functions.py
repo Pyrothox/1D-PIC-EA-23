@@ -236,20 +236,20 @@ def get_particle_indexes_in_cells(Np, partx, tabx, cells_indexes, dx):
 
 
 def numba_return_part_diag_weighted(Np, partx, partv, weight, tabx, diag, dx, power):
-    """general function for the particle to grid diagnostics"""
+    """general function for the particle to grid diagnostics (weighted by per-particle weight).
+    Returns raw sums (not normalized)."""
 
-    sum_weights = np.sum(weight)
-    if sum_weights == 0:
+    if np.sum(weight) == 0:
         return diag
-    
+
     if power == 0:
-        return particle_to_grid(Np, partx, weight, tabx, diag, dx) / sum_weights
+        return particle_to_grid(Np, partx, weight, tabx, diag, dx)
     elif power == 1:
         weighted_info = partv * weight
-        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx) / sum_weights
+        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx)
     elif power > 0:
         weighted_info = numba_power(partv, power) * weight
-        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx) / sum_weights
+        return particle_to_grid(Np, partx, weighted_info, tabx, diag, dx)
 
     else:
         print("Unknow dignostics !!")
@@ -358,19 +358,23 @@ def popout_weighted(x, V, w, val, absorbtion):
 
     return:
     =======
-    compt: int64 number of elements put at the end of x
+    left_count, right_count, left_weight, right_weight
 
     """
     ## Init the parameters ##
     compt = 0
     left = 0
     right = 0
+    left_w = 0.0
+    right_w = 0.0
     N = len(x)
     zeros = np.zeros(3)
     ## Linear search from the end of the table ##
     pos = x[-1]
     if absorbtion:
         if (pos >= val) or (pos <= 0):  # check for the last particle
+            # capture its weight before zeroing
+            w_last = w[-1]
             x[-1] = -1
             V[-1] = zeros
             w[-1] = 0.0
@@ -378,8 +382,10 @@ def popout_weighted(x, V, w, val, absorbtion):
             compt += 1
             if pos >= val:
                 right += 1
+                right_w += w_last
             else:
                 left += 1
+                left_w += w_last
 
         for i in np.arange(N - 2, -1, -1):
             pos = x[i]
@@ -391,28 +397,19 @@ def popout_weighted(x, V, w, val, absorbtion):
 
                 V[i, :] = V[-compt - 1, :]
                 V[-compt - 1, :] = zeros
-                tmp = w[-compt - 1]
+                tmp_w = w[-compt - 1]
                 w[-compt - 1] = 0.0
-                w[i] = tmp
+                w[i] = tmp_w
 
                 compt += 1
                 if pos >= val:
                     right += 1
+                    right_w += tmp_w
                 else:
                     left += 1
+                    left_w += tmp_w
 
-    else:
-        for i in range(len(x)):  # in case of reflection
-            pos = x[i]
-            if pos >= val:
-                x[i] = 2 * val - pos
-                V[i] = -V[i]
-
-            if pos <= 0:
-                x[i] = -x[i]
-                V[i] = -V[i]
-
-    return (left, right)
+    return left, right, left_w, right_w
 
 @njit
 def popout(x, V, val, absorbtion):
@@ -736,6 +733,26 @@ def histograms_v(positions, v, probe_size, bin_size, out):
         clippedValue = min(max(0.0, (v + v_max)), 2 * v_max)
         j = int(clippedValue / bin_size)
         out[i, j] += 1.0
+
+
+@njit
+def histograms_weighted(positions, v_squared, weights, probe_size, bin_size, out):
+    """Weighted histogram: adds particle weight instead of 1"""
+    max_j = out.shape[1] - 1
+    for x, v, w in zip(positions, v_squared, weights):
+        i = int(x / probe_size)
+        j = min(int(v / bin_size), max_j)
+        out[i, j] += w
+
+
+@njit
+def histograms_v_weighted(positions, v, weights, probe_size, bin_size, out):
+    v_max = bin_size * (out.shape[1] / 2.0)
+    for x, v, w in zip(positions, v, weights):
+        i = int(x / probe_size)
+        clippedValue = min(max(0.0, (v + v_max)), 2 * v_max)
+        j = int(clippedValue / bin_size)
+        out[i, j] += w
 
 
 def random_round(x):

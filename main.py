@@ -144,6 +144,7 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
         # entire cycle duration Nt
         for avg_nt in range(t0, parameters["Nt"], parameters["n_average"]):
             # average cycle duration n_average
+            cycle = 0
             for nt in range(avg_nt, avg_nt + parameters["n_average"]):
                 pla.pusher()
                 pla.boundary()
@@ -154,7 +155,7 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
                 pla.solve_poisson(nt)
                 pla.diags(nt)
                 
-        
+            cycle +=1
             pla.diagnostics.average_diags(parameters["n_average"])
             if pla.wall is not None:
                 pla.wall.update()

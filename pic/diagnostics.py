@@ -16,6 +16,8 @@ from pic.functions import (
     particle_to_grid_order0,
     histograms,
     histograms_v,
+    histograms_weighted,
+    histograms_v_weighted,
 )
 import astropy.units as u
 from astropy.constants import eps0
@@ -200,7 +202,8 @@ class Measure_n(ParticleMeasure):
         self.values += self.particles.n
 
     def average(self, N_average):
-        self.values *= self.plasma.qf / (self.plasma.dx * N_average)
+        # values are sums of particle weights per cell collected over records
+        self.values *= 1.0 / (self.plasma.dx * N_average)
 
 
 class Measure_phi(Measure):
@@ -265,19 +268,19 @@ class Measure_J(ParticleMeasure):
         value_dict[(specie.symbol, self.name)] = self.values
 
     def record(self):
+        info = self.particles.V[: self.particles.Npart, 0] * self.particles.w[: self.particles.Npart]
         particle_to_grid(
             self.particles.Npart,
-            self.particles.x,
-            self.particles.V[:, 0],
+            self.particles.x[: self.particles.Npart],
+            info,
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
         )
 
     def average(self, N_average):
-        self.values *= (
-            self.plasma.qf * self.particles.charge / (N_average * self.plasma.dx)
-        )
+        # weights already include real particle number, multiply by charge and normalize by cell length/time
+        self.values *= (self.particles.charge / (N_average * self.plasma.dx))
 
 
 class Measure_P(ParticleMeasure):
@@ -291,18 +294,23 @@ class Measure_P(ParticleMeasure):
     def record(self):
         # loop over xx, yx, yy, zx, zy, zz
         for k, (i, j) in enumerate([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]):
+            info = (
+                self.particles.c[: self.particles.Npart, i]
+                * self.particles.c[: self.particles.Npart, j]
+                * self.particles.w[: self.particles.Npart]
+            )
             particle_to_grid(
                 self.particles.Npart,
-                self.particles.x,
-                self.particles.c[: self.particles.Npart, i]
-                * self.particles.c[: self.particles.Npart, j],
+                self.particles.x[: self.particles.Npart],
+                info,
                 self.plasma.x_j,
                 self.values[:, k],
                 self.plasma.dx,
             )
 
     def average(self, N_average):
-        self.values *= self.plasma.qf * self.particles.m / (self.plasma.dx * N_average)
+        # weights already include real particle number, multiply by mass and normalize by cell length
+        self.values *= self.particles.m / (self.plasma.dx * N_average)
 
 
 class Measure_q(ParticleMeasure):
@@ -315,10 +323,13 @@ class Measure_q(ParticleMeasure):
     def record(self):
         c_square = np.sum(np.square(self.particles.c[: self.particles.Npart]), axis=1)
         for k in range(3):
+            info = (
+                self.particles.c[: self.particles.Npart, k] * c_square * self.particles.w[: self.particles.Npart]
+            )
             particle_to_grid(
                 self.particles.Npart,
-                self.particles.x,
-                self.particles.c[: self.particles.Npart, k] * c_square,
+                self.particles.x[: self.particles.Npart],
+                info,
                 self.plasma.x_j,
                 self.values[:, k],
                 self.plasma.dx,
@@ -326,7 +337,7 @@ class Measure_q(ParticleMeasure):
 
     def average(self, N_average):
         self.values *= (
-            self.plasma.qf * self.particles.m / (2 * self.plasma.dx * N_average)
+            self.particles.m / (2 * self.plasma.dx * N_average)
         )
 
 
@@ -337,10 +348,11 @@ class Measure_E(ParticleMeasure):
         value_dict[(specie.symbol, self.name)] = self.values
 
     def record(self):
+        info = np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart]
         particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            info,
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
@@ -348,7 +360,7 @@ class Measure_E(ParticleMeasure):
 
     def average(self, N_average):
         self.values *= (
-            self.plasma.qf * self.particles.m / (2 * self.plasma.dx * N_average)
+            self.particles.m / (2 * self.plasma.dx * N_average)
         )
 
 
@@ -357,11 +369,15 @@ class Measure_PowerDensity(ParticleMeasure):
         super().__init__("Power", plasma, specie, value_dict)
 
     def record(self):
+        info = (
+            self.particles.V[: self.particles.Npart, 0]
+            * self.particles.E_interp[: self.particles.Npart]
+            * self.particles.w[: self.particles.Npart]
+        )
         particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            self.particles.V[: self.particles.Npart, 0]
-            * self.particles.E_interp[: self.particles.Npart],
+            info,
             self.plasma.x_j,
             self.values,
             self.plasma.dx,
@@ -371,7 +387,7 @@ class Measure_PowerDensity(ParticleMeasure):
 
     def average(self, N_average):
         self.values *= (
-            self.particles.charge * self.plasma.qf / (self.plasma.dx * N_average)
+            self.particles.charge / (self.plasma.dx * N_average)
         )
 
 
@@ -405,18 +421,19 @@ class MeasureEnergyDistribution(ParticleMeasure):
             v_squared = np.sum(
                 np.square(self.particles.V[: self.particles.Npart]), axis=1
             )
-        histograms(
-            self.particles.x,
+        histograms_weighted(
+            self.particles.x[: self.particles.Npart],
             v_squared,
+            self.particles.w[: self.particles.Npart],
             self.probe_size,
             self.bin_size,
             self.values,
         )
 
     def average(self, N_average):
+        # weights already reflect real particle counts
         self.values *= (
-            self.plasma.qf
-            * self.resolution
+            self.resolution
             / (N_average * self.probe_size * self.energy_max)
         )
 
@@ -428,8 +445,7 @@ class MeasureEnergyDistribution(ParticleMeasure):
         self.values.fill(0)
         self.record()
         self.values *= (
-            self.plasma.qf
-            * self.resolution
+            self.resolution
             / (self.probe_size * self.energy_max)
         )
         f.create_dataset(f"{self.name}_instant", data=self.values)
@@ -464,17 +480,19 @@ class MeasureVelocityDistribution(ParticleMeasure):
             )
         else:
             v_x = self.particles.V[: self.particles.Npart, 0]
-        histograms_v(
-            self.particles.x,
+        histograms_v_weighted(
+            self.particles.x[: self.particles.Npart],
             v_x,
+            self.particles.w[: self.particles.Npart],
             self.probe_size,
             self.bin_size,
             self.values,
         )
 
     def average(self, N_average):
+        # weights already reflect real particle counts
         self.values *= (
-            self.plasma.qf * self.resolution / (N_average * self.probe_size * self.vmax)
+            self.resolution / (N_average * self.probe_size * self.vmax)
         )
 
 
@@ -490,7 +508,8 @@ class MeasureFlux(ParticleMeasure):
         self.values[1] += right
 
     def average(self, N_average):
-        self.values *= self.plasma.qf / (self.plasma.dT * N_average)
+        # self.values contains sum of removed weights (real particle numbers) per record
+        self.values *= 1.0 / (self.plasma.dT * N_average)
 
 
 class MeasureLossesYZ(ParticleMeasure):
@@ -500,13 +519,20 @@ class MeasureLossesYZ(ParticleMeasure):
             raise ValueError("No wall defined")
         plasma.wall.add_diagnostic(self, self.particles)
 
-    def accumulate(self, x: np.ndarray):
-        particle_to_grid_order0(
-            x.shape[0], x, self.plasma.x_j, self.values, self.plasma.dx
+    def accumulate(self, x: np.ndarray, w: np.ndarray):
+        # accumulate weight into grid (w is per-particle weight)
+        particle_to_grid(
+            x.shape[0],
+            x,
+            w,
+            self.plasma.x_j,
+            self.values,
+            self.plasma.dx,
         )
 
     def average(self, N_average):
-        self.values *= self.plasma.qf / (self.plasma.dx * self.plasma.dT * N_average)
+        # values are sums of weights per cell per record
+        self.values *= 1.0 / (self.plasma.dx * self.plasma.dT * N_average)
 
 
 class Measure_Ed(ParticleMeasure):
@@ -516,14 +542,16 @@ class Measure_Ed(ParticleMeasure):
         value_dict[(specie.symbol, self.name)] = self.values
 
     def record(self):
+        info = np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart]
         e = particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            info,
             self.plasma.x_j,
             np.zeros_like(self.values),
             self.plasma.dx,
         )
+        # e is sum(v^2 * w) per cell, self.particles.n is sum(w) per cell, so division yields weighted average v^2
         self.values += np.divide(e, self.particles.n, where=self.particles.n != 0.0)
 
     def average(self, N_average):
@@ -538,10 +566,11 @@ class Measure_T(ParticleMeasure):
         self.particles.need_u = True
 
     def record(self):
+        info = np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart]
         e = particle_to_grid(
             self.particles.Npart,
             self.particles.x[: self.particles.Npart],
-            np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1),
+            info,
             self.plasma.x_j,
             np.zeros_like(self.values),
             self.plasma.dx,
@@ -588,9 +617,10 @@ class MeasureEnergyDdistributionNormalized(ParticleMeasure):
                 np.square(self.particles.V[: self.particles.Npart]), axis=1
             )
         temp_hist = np.zeros_like(self.values)
-        histograms(
-            self.particles.x,
+        histograms_weighted(
+            self.particles.x[: self.particles.Npart],
             v_squared,
+            self.particles.w[: self.particles.Npart],
             self.probe_size,
             self.bin_size,
             temp_hist,
@@ -636,9 +666,11 @@ class CollisionRate(ParticleMeasure):
     def before(self, I_coll: np.ndarray, mcc: MCC | InterspeciesMCC, collision):
         buffer = self.values[mcc.target_symbol()].get(collision.name)
         if buffer is not None:
-            particle_to_grid_order0(
+            # accumulate removed weights per cell for collision diagnostics
+            particle_to_grid(
                 I_coll.shape[0],
                 self.particles.x[I_coll],
+                self.particles.w[I_coll],
                 self.plasma.x_j,
                 buffer,
                 self.plasma.dx,
@@ -653,7 +685,7 @@ class CollisionRate(ParticleMeasure):
     def average(self, N_average):
         for d in self.values.values():
             for v in d.values():
-                v *= self.plasma.qf / (self.plasma.dx * self.plasma.dT * N_average)
+                v *= 1.0 / (self.plasma.dx * self.plasma.dT * N_average)
 
     def save(self, f):
         for target, d in self.values.items():
@@ -678,16 +710,22 @@ class CollisionMomentumTransfer(CollisionRate):
     def before(self, I_coll: np.ndarray, mcc, collision):
         self.current = self.values[mcc.target_symbol()].get(collision.name)
         if self.current is not None:
-            self.before_values = (self.particles.x[I_coll], self.particles.V[I_coll, 0])
+            # store positions, velocities and weights for this collision batch
+            self.before_values = (
+                self.particles.x[I_coll],
+                self.particles.V[I_coll, 0],
+                self.particles.w[I_coll],
+            )
 
     def after(self, I_coll):
         if self.current is None:
             return
-        x, vi = self.before_values
+        x, vi, w = self.before_values
+        info = (vi - self.particles.V[I_coll, 0]) * w
         particle_to_grid(
             I_coll.shape[0],
             x,
-            vi - self.particles.V[I_coll, 0],
+            info,
             self.plasma.x_j,
             self.current,
             self.plasma.dx,
@@ -699,7 +737,6 @@ class CollisionMomentumTransfer(CollisionRate):
             for v in d.values():
                 v *= (
                     self.particles.m
-                    * self.plasma.qf
                     / (self.plasma.dx * self.plasma.dT * N_average)
                 )
 
@@ -717,16 +754,18 @@ class CollisionEnergyTransfer(CollisionRate):
             self.before_values = (
                 self.particles.x[I_coll],
                 np.sum(np.square(self.particles.V[I_coll]), axis=1),
+                self.particles.w[I_coll],
             )
 
     def after(self, I_coll):
         if self.current is None:
             return
-        x, vi2 = self.before_values
+        x, vi2, w = self.before_values
+        info = (vi2 - np.sum(np.square(self.particles.V[I_coll]), axis=1)) * w
         particle_to_grid(
             I_coll.shape[0],
             x,
-            vi2 - np.sum(np.square(self.particles.V[I_coll]), axis=1),
+            info,
             self.plasma.x_j,
             self.current,
             self.plasma.dx,
@@ -738,7 +777,6 @@ class CollisionEnergyTransfer(CollisionRate):
             for v in d.values():
                 v *= (
                     self.particles.m
-                    * self.plasma.qf
                     / (self.plasma.dx * self.plasma.dT * N_average * 2)
                 )
 
@@ -751,4 +789,5 @@ class MeasureInj(Measure):
         plasma.inj_diag = True
 
     def average(self, N_average):
-        self.values *= self.plasma.qf / (self.plasma.dx * self.plasma.dT * N_average)
+        # injected weights are physical counts, normalize by volume/time and averaging window
+        self.values *= 1.0 / (self.plasma.dx * self.plasma.dT * N_average)
