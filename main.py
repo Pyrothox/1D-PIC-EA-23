@@ -150,7 +150,7 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
                 pla.boundary()
                 pla.apply_mcc()
                 pla.inject()
-                dpmsa.execute(nt)
+                #dpmsa.execute(nt)
                 pla.compute_rho()
                 pla.solve_poisson(nt)
                 pla.diags(nt)

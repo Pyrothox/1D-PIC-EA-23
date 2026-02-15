@@ -190,13 +190,19 @@ class Hdf5Viewer:
                         quant[i, ...] = u.Quantity(f[name], self.units[name])
 
                     for specie, value in self.edf.items():
-                        value[2][i, ...] = f[f"{specie.symbol}/EDF"] * u.m**-3 / u.J
+                        edf_key = f"{specie.symbol}/EDF"
+                        if edf_key in f:
+                            value[2][i, ...] = f[edf_key] * u.m**-3 / u.J
                     for specie, value in self.edfn.items():
-                        value[2][i, ...] = f[f"{specie.symbol}/EDFN"] * u.J**-1
+                        edfn_key = f"{specie.symbol}/EDFN"
+                        if edfn_key in f:
+                            value[2][i, ...] = f[edfn_key] * u.J**-1
                     for specie, value in self.vdf.items():
-                        value[2][i, ...] = (
-                            f[f"{specie.symbol}/VDF"] * u.m**-3 / (u.m / u.s)
-                        )
+                        vdf_key = f"{specie.symbol}/VDF"
+                        if vdf_key in f:
+                            value[2][i, ...] = (
+                                f[vdf_key] * u.m**-3 / (u.m / u.s)
+                            )
 
                     fill_collisions_diag(
                         self.collisions_rates,
