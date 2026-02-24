@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DPMSA Benchmarking Script
+DPMSA Benchmarking Script - CORRECTED for actual HDF5 structure
 Compares PIC simulations with and without Dynamic Particle Merging & Splitting Algorithm
 
-Created: 2026-02-08
+Created: 2026-02-10
 Author: Manef
 """
 
@@ -14,15 +14,16 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import pickle
 from pathlib import Path
+import h5py
 
 from pic.Hdf5Viewer import Hdf5Viewer
 from plasmapy import particles
 import astropy.units as u
 
-# Define particles
+# Define particles - use the exact names from your HDF5 files
 ele = particles.electron
-ion = particles.Particle("He+")  # Adjust based on your simulation
-neutral = particles.Particle("He")  # Adjust based on your simulation
+ion = particles.Particle("He+")
+neutral = particles.Particle("He")
 
 
 class DPMSA_Benchmark:
@@ -42,10 +43,20 @@ class DPMSA_Benchmark:
             Path to simulation data WITH merging & splitting
         """
         print(f"Loading simulation without M&S from: {sim_without_ms_path}")
-        self.sim_no_ms = Hdf5Viewer(sim_without_ms_path)
+        try:
+            self.sim_no_ms = Hdf5Viewer(sim_without_ms_path)
+            print("✓ Successfully loaded simulation without M&S")
+        except Exception as e:
+            print(f"✗ Error loading simulation without M&S: {e}")
+            raise
         
-        print(f"Loading simulation with M&S from: {sim_with_ms_path}")
-        self.sim_with_ms = Hdf5Viewer(sim_with_ms_path)
+        print(f"\nLoading simulation with M&S from: {sim_with_ms_path}")
+        try:
+            self.sim_with_ms = Hdf5Viewer(sim_with_ms_path)
+            print("✓ Successfully loaded simulation with M&S")
+        except Exception as e:
+            print(f"✗ Error loading simulation with M&S: {e}")
+            raise
         
         # Extract metadata
         self.x = self.sim_no_ms.x
@@ -61,6 +72,14 @@ class DPMSA_Benchmark:
         print(f"  Time steps: {self.params_no_ms['Nt']}")
         print(f"  Initial particles: {self.params_no_ms['Npart']}")
         
+        # Check available diagnostics
+        print(f"\nAvailable diagnostics:")
+        print(f"  Particle species: {list(self.sim_no_ms.particle_data.keys())}")
+        if self.sim_no_ms.particle_data:
+            for species in self.sim_no_ms.particle_data.keys():
+                print(f"  {species.symbol}: {list(self.sim_no_ms.particle_data[species].keys())}")
+        print(f"  Files loaded: {self.sim_no_ms.n_files}/{len(self.t)-1}")
+    
     def compare_densities(self, time_index=-1, average=5, ax=None, species='both'):
         """
         Compare electron and ion density profiles
@@ -79,11 +98,11 @@ class DPMSA_Benchmark:
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(10, 6))
         
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
+        i = time_index if time_index >= 0 else min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
         i_start = max(0, i - average // 2)
-        i_end = i_start + average
+        i_end = min(i_start + average, i + 1)
         
-        if species in ['electron', 'both']:
+        if species in ['electron', 'both'] and 'n' in self.sim_no_ms.particle_data[ele]:
             ne_no_ms = np.mean(
                 self.sim_no_ms.particle_data[ele]["n"][i_start:i_end], axis=0
             )
@@ -94,7 +113,7 @@ class DPMSA_Benchmark:
             ax.plot(self.x, ne_no_ms, 'b-', linewidth=2, label='Electron (No M&S)')
             ax.plot(self.x, ne_with_ms, 'b--', linewidth=2, label='Electron (With M&S)')
         
-        if species in ['ion', 'both']:
+        if species in ['ion', 'both'] and 'n' in self.sim_no_ms.particle_data[ion]:
             ni_no_ms = np.mean(
                 self.sim_no_ms.particle_data[ion]["n"][i_start:i_end], axis=0
             )
@@ -113,94 +132,50 @@ class DPMSA_Benchmark:
         
         return ax
     
-    def compare_temperature(self, time_index=-1, average=5, ax=None, species='both'):
+    def compare_velocity(self, time_index=-1, average=5, ax=None, component=0):
         """
-        Compare electron and ion temperature profiles
+        Compare electron and ion velocity profiles
+        
+        Parameters:
+        -----------
+        component : int
+            Velocity component (0=x, 1=y, 2=z)
         """
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(10, 6))
         
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
+        i = time_index if time_index >= 0 else min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
         i_start = max(0, i - average // 2)
-        i_end = i_start + average
+        i_end = min(i_start + average, i + 1)
         
-        if species in ['electron', 'both'] and 'T' in self.sim_no_ms.particle_data[ele]:
-            Te_no_ms = np.mean(
-                self.sim_no_ms.particle_data[ele]["T"][i_start:i_end], axis=0
+        if 'V' in self.sim_no_ms.particle_data[ele]:
+            Ve_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ele]["V"][i_start:i_end, :, component], axis=0
             )
-            Te_with_ms = np.mean(
-                self.sim_with_ms.particle_data[ele]["T"][i_start:i_end], axis=0
+            Ve_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ele]["V"][i_start:i_end, :, component], axis=0
             )
             
-            ax.plot(self.x, Te_no_ms, 'b-', linewidth=2, label='Electron (No M&S)')
-            ax.plot(self.x, Te_with_ms, 'b--', linewidth=2, label='Electron (With M&S)')
+            ax.plot(self.x, Ve_no_ms, 'b-', linewidth=2, label='Electron (No M&S)')
+            ax.plot(self.x, Ve_with_ms, 'b--', linewidth=2, label='Electron (With M&S)')
         
-        if species in ['ion', 'both'] and 'T' in self.sim_no_ms.particle_data[ion]:
-            Ti_no_ms = np.mean(
-                self.sim_no_ms.particle_data[ion]["T"][i_start:i_end], axis=0
+        if 'V' in self.sim_no_ms.particle_data[ion]:
+            Vi_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ion]["V"][i_start:i_end, :, component], axis=0
             )
-            Ti_with_ms = np.mean(
-                self.sim_with_ms.particle_data[ion]["T"][i_start:i_end], axis=0
+            Vi_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ion]["V"][i_start:i_end, :, component], axis=0
             )
             
-            ax.plot(self.x, Ti_no_ms, 'r-', linewidth=2, label='Ion (No M&S)')
-            ax.plot(self.x, Ti_with_ms, 'r--', linewidth=2, label='Ion (With M&S)')
+            ax.plot(self.x, Vi_no_ms, 'r-', linewidth=2, label='Ion (No M&S)')
+            ax.plot(self.x, Vi_with_ms, 'r--', linewidth=2, label='Ion (With M&S)')
         
+        comp_labels = ['x', 'y', 'z']
         ax.set_xlabel('Position [m]', fontsize=12)
-        ax.set_ylabel('Temperature [eV]', fontsize=12)
-        ax.set_title(f'Temperature Comparison at t = {self.t[i]:.2e}', fontsize=14)
+        ax.set_ylabel(f'Velocity {comp_labels[component]} [m/s]', fontsize=12)
+        ax.set_title(f'Velocity Comparison at t = {self.t[i]:.2e}', fontsize=14)
         ax.legend(loc='best')
         ax.grid(True, alpha=0.3)
-        
-        return ax
-    
-    def compare_eepf(self, time_index=-1, probe_index=0, ax=None):
-        """
-        Compare Electron Energy Probability Function (EEPF)
-        """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-        
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
-        
-        if ele in self.sim_no_ms.edf:
-            x_probes, energy_no_ms, edf_no_ms = self.sim_no_ms.edf[ele]
-            _, energy_with_ms, edf_with_ms = self.sim_with_ms.edf[ele]
-            
-            # Convert EDF to EEPF (normalized by sqrt(energy))
-            eepf_no_ms = edf_no_ms[i, probe_index, :] / np.sqrt(energy_no_ms)
-            eepf_with_ms = edf_with_ms[i, probe_index, :] / np.sqrt(energy_with_ms)
-            
-            # Normalize by integral
-            eepf_no_ms /= np.trapz(eepf_no_ms, energy_no_ms.to(u.eV).value)
-            eepf_with_ms /= np.trapz(eepf_with_ms, energy_with_ms.to(u.eV).value)
-            
-            ax.semilogy(
-                energy_no_ms.to(u.eV), 
-                eepf_no_ms, 
-                'b-', 
-                linewidth=2, 
-                label='No M&S'
-            )
-            ax.semilogy(
-                energy_with_ms.to(u.eV), 
-                eepf_with_ms, 
-                'r--', 
-                linewidth=2, 
-                label='With M&S'
-            )
-            
-            ax.set_xlabel('Energy [eV]', fontsize=12)
-            ax.set_ylabel('EEPF [eV⁻³/²]', fontsize=12)
-            ax.set_title(
-                f'EEPF Comparison at x = {x_probes[probe_index]:.3f} m', 
-                fontsize=14
-            )
-            ax.legend(loc='best')
-            ax.grid(True, alpha=0.3)
-        else:
-            ax.text(0.5, 0.5, 'EDF data not available', 
-                   ha='center', va='center', transform=ax.transAxes)
         
         return ax
     
@@ -211,9 +186,9 @@ class DPMSA_Benchmark:
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(10, 6))
         
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
+        i = time_index if time_index >= 0 else min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
         i_start = max(0, i - average // 2)
-        i_end = i_start + average
+        i_end = min(i_start + average, i + 1)
         
         if 'Power' in self.sim_no_ms.particle_data[ele]:
             power_no_ms = np.mean(
@@ -228,75 +203,44 @@ class DPMSA_Benchmark:
                 power_no_ms.to(u.kW / u.m**3), 
                 'b-', 
                 linewidth=2, 
-                label='No M&S'
+                label='Electron (No M&S)'
             )
             ax.plot(
                 self.x, 
                 power_with_ms.to(u.kW / u.m**3), 
-                'r--', 
+                'b--', 
                 linewidth=2, 
-                label='With M&S'
+                label='Electron (With M&S)'
+            )
+        
+        if 'Power' in self.sim_no_ms.particle_data[ion]:
+            power_no_ms_ion = np.mean(
+                self.sim_no_ms.particle_data[ion]["Power"][i_start:i_end], axis=0
+            )
+            power_with_ms_ion = np.mean(
+                self.sim_with_ms.particle_data[ion]["Power"][i_start:i_end], axis=0
             )
             
-            ax.set_xlabel('Position [m]', fontsize=12)
-            ax.set_ylabel('Power Deposition [kW/m³]', fontsize=12)
-            ax.set_title(f'Power Deposition at t = {self.t[i]:.2e}', fontsize=14)
-            ax.legend(loc='best')
-            ax.grid(True, alpha=0.3)
-        else:
-            ax.text(0.5, 0.5, 'Power deposition data not available', 
-                   ha='center', va='center', transform=ax.transAxes)
+            ax.plot(
+                self.x, 
+                power_no_ms_ion.to(u.kW / u.m**3), 
+                'r-', 
+                linewidth=2, 
+                label='Ion (No M&S)'
+            )
+            ax.plot(
+                self.x, 
+                power_with_ms_ion.to(u.kW / u.m**3), 
+                'r--', 
+                linewidth=2, 
+                label='Ion (With M&S)'
+            )
         
-        return ax
-    
-    def compare_ionization_rate(self, time_index=-1, ax=None):
-        """
-        Compare ionization rate spatial distribution
-        """
-        if ax is None:
-            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-        
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
-        
-        if (ele in self.sim_no_ms.collisions_rates and 
-            neutral in self.sim_no_ms.collisions_rates[ele]):
-            
-            rates_no_ms = self.sim_no_ms.collisions_rates[ele][neutral]
-            rates_with_ms = self.sim_with_ms.collisions_rates[ele][neutral]
-            
-            # Find ionization reaction
-            ioniz_key = [k for k in rates_no_ms.keys() if 'IONIZATION' in k.upper()]
-            
-            if ioniz_key:
-                ioniz_no_ms = rates_no_ms[ioniz_key[0]][i, :]
-                ioniz_with_ms = rates_with_ms[ioniz_key[0]][i, :]
-                
-                ax.plot(
-                    self.x, 
-                    ioniz_no_ms.to(u.m**-3 / u.s), 
-                    'b-', 
-                    linewidth=2, 
-                    label='No M&S'
-                )
-                ax.plot(
-                    self.x, 
-                    ioniz_with_ms.to(u.m**-3 / u.s), 
-                    'r--', 
-                    linewidth=2, 
-                    label='With M&S'
-                )
-                
-                ax.set_xlabel('Position [m]', fontsize=12)
-                ax.set_ylabel('Ionization Rate [m⁻³/s]', fontsize=12)
-                ax.set_title(f'Ionization Rate at t = {self.t[i]:.2e}', fontsize=14)
-                ax.legend(loc='best')
-                ax.grid(True, alpha=0.3)
-            else:
-                ax.text(0.5, 0.5, 'Ionization data not found', 
-                       ha='center', va='center', transform=ax.transAxes)
-        else:
-            ax.text(0.5, 0.5, 'Collision rate data not available', 
-                   ha='center', va='center', transform=ax.transAxes)
+        ax.set_xlabel('Position [m]', fontsize=12)
+        ax.set_ylabel('Power Deposition [kW/m³]', fontsize=12)
+        ax.set_title(f'Power Deposition at t = {self.t[i]:.2e}', fontsize=14)
+        ax.legend(loc='best')
+        ax.grid(True, alpha=0.3)
         
         return ax
     
@@ -306,10 +250,6 @@ class DPMSA_Benchmark:
         """
         if ax is None:
             fig, ax = plt.subplots(1, 1, figsize=(10, 6))
-        
-        # Extract particle count from parameters or diagnostics
-        # Note: This requires tracking particle count in diagnostics
-        # If not available, we can estimate from density integral
         
         # Calculate total particles (integral of density * volume element)
         dx = self.sim_no_ms.dx
@@ -321,19 +261,43 @@ class DPMSA_Benchmark:
             self.sim_with_ms.particle_data[ele]["n"], axis=1
         ) * dx
         
+        n_ions_no_ms = np.sum(
+            self.sim_no_ms.particle_data[ion]["n"], axis=1
+        ) * dx
+        n_ions_with_ms = np.sum(
+            self.sim_with_ms.particle_data[ion]["n"], axis=1
+        ) * dx
+        
+        n_files = min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
+        
         ax.plot(
-            self.t[:self.sim_no_ms.n_files], 
-            n_electrons_no_ms[:self.sim_no_ms.n_files], 
+            self.t[:n_files], 
+            n_electrons_no_ms[:n_files], 
             'b-', 
             linewidth=2, 
             label='Electrons (No M&S)'
         )
         ax.plot(
-            self.t[:self.sim_with_ms.n_files], 
-            n_electrons_with_ms[:self.sim_with_ms.n_files], 
-            'r--', 
+            self.t[:n_files], 
+            n_electrons_with_ms[:n_files], 
+            'b--', 
             linewidth=2, 
             label='Electrons (With M&S)'
+        )
+        
+        ax.plot(
+            self.t[:n_files], 
+            n_ions_no_ms[:n_files], 
+            'r-', 
+            linewidth=2, 
+            label='Ions (No M&S)'
+        )
+        ax.plot(
+            self.t[:n_files], 
+            n_ions_with_ms[:n_files], 
+            'r--', 
+            linewidth=2, 
+            label='Ions (With M&S)'
         )
         
         ax.set_xlabel('Time [s]', fontsize=12)
@@ -350,9 +314,9 @@ class DPMSA_Benchmark:
         
         Returns dictionary with relative errors for various quantities
         """
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
+        i = time_index if time_index >= 0 else min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
         i_start = max(0, i - average // 2)
-        i_end = i_start + average
+        i_end = min(i_start + average, i + 1)
         
         errors = {}
         
@@ -364,9 +328,9 @@ class DPMSA_Benchmark:
             self.sim_with_ms.particle_data[ele]["n"][i_start:i_end], axis=0
         )
         errors['electron_density'] = {
-            'max_relative': np.max(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms)),
-            'mean_relative': np.mean(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms)),
-            'rms': np.sqrt(np.mean(((ne_with_ms - ne_no_ms) / ne_no_ms)**2))
+            'max_relative': float(np.max(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms))),
+            'mean_relative': float(np.mean(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms))),
+            'rms': float(np.sqrt(np.mean(((ne_with_ms - ne_no_ms) / ne_no_ms)**2)))
         }
         
         # Ion density error
@@ -377,24 +341,27 @@ class DPMSA_Benchmark:
             self.sim_with_ms.particle_data[ion]["n"][i_start:i_end], axis=0
         )
         errors['ion_density'] = {
-            'max_relative': np.max(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms)),
-            'mean_relative': np.mean(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms)),
-            'rms': np.sqrt(np.mean(((ni_with_ms - ni_no_ms) / ni_no_ms)**2))
+            'max_relative': float(np.max(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms))),
+            'mean_relative': float(np.mean(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms))),
+            'rms': float(np.sqrt(np.mean(((ni_with_ms - ni_no_ms) / ni_no_ms)**2)))
         }
         
-        # Temperature errors (if available)
-        if 'T' in self.sim_no_ms.particle_data[ele]:
-            Te_no_ms = np.mean(
-                self.sim_no_ms.particle_data[ele]["T"][i_start:i_end], axis=0
-            )
-            Te_with_ms = np.mean(
-                self.sim_with_ms.particle_data[ele]["T"][i_start:i_end], axis=0
-            )
-            errors['electron_temperature'] = {
-                'max_relative': np.max(np.abs((Te_with_ms - Te_no_ms) / Te_no_ms)),
-                'mean_relative': np.mean(np.abs((Te_with_ms - Te_no_ms) / Te_no_ms)),
-                'rms': np.sqrt(np.mean(((Te_with_ms - Te_no_ms) / Te_no_ms)**2))
-            }
+        # Power deposition errors (if available)
+        if 'Power' in self.sim_no_ms.particle_data[ele]:
+            Pe_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ele]["Power"][i_start:i_end], axis=0
+            ).value
+            Pe_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ele]["Power"][i_start:i_end], axis=0
+            ).value
+            # Avoid division by very small numbers
+            mask = np.abs(Pe_no_ms) > 1e-10
+            if np.any(mask):
+                errors['electron_power'] = {
+                    'max_relative': float(np.max(np.abs((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask]))),
+                    'mean_relative': float(np.mean(np.abs((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask]))),
+                    'rms': float(np.sqrt(np.mean(((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask])**2)))
+                }
         
         return errors
     
@@ -402,19 +369,19 @@ class DPMSA_Benchmark:
         """
         Plot spatial profiles of relative errors
         """
-        i = time_index if time_index >= 0 else self.sim_no_ms.n_files + time_index
+        i = time_index if time_index >= 0 else min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
         i_start = max(0, i - average // 2)
-        i_end = i_start + average
+        i_end = min(i_start + average, i + 1)
         
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         
         # Electron density error
         ne_no_ms = np.mean(
             self.sim_no_ms.particle_data[ele]["n"][i_start:i_end], axis=0
-        )
+        ).value
         ne_with_ms = np.mean(
             self.sim_with_ms.particle_data[ele]["n"][i_start:i_end], axis=0
-        )
+        ).value
         rel_error_ne = (ne_with_ms - ne_no_ms) / ne_no_ms * 100
         
         axes[0, 0].plot(self.x, rel_error_ne, 'b-', linewidth=2)
@@ -427,10 +394,10 @@ class DPMSA_Benchmark:
         # Ion density error
         ni_no_ms = np.mean(
             self.sim_no_ms.particle_data[ion]["n"][i_start:i_end], axis=0
-        )
+        ).value
         ni_with_ms = np.mean(
             self.sim_with_ms.particle_data[ion]["n"][i_start:i_end], axis=0
-        )
+        ).value
         rel_error_ni = (ni_with_ms - ni_no_ms) / ni_no_ms * 100
         
         axes[0, 1].plot(self.x, rel_error_ni, 'r-', linewidth=2)
@@ -440,37 +407,41 @@ class DPMSA_Benchmark:
         axes[0, 1].set_title('Ion Density Error')
         axes[0, 1].grid(True, alpha=0.3)
         
-        # Temperature errors (if available)
-        if 'T' in self.sim_no_ms.particle_data[ele]:
-            Te_no_ms = np.mean(
-                self.sim_no_ms.particle_data[ele]["T"][i_start:i_end], axis=0
-            )
-            Te_with_ms = np.mean(
-                self.sim_with_ms.particle_data[ele]["T"][i_start:i_end], axis=0
-            )
-            rel_error_Te = (Te_with_ms - Te_no_ms) / Te_no_ms * 100
+        # Velocity errors (if available)
+        if 'V' in self.sim_no_ms.particle_data[ele]:
+            Ve_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ele]["V"][i_start:i_end, :, 0], axis=0
+            ).value
+            Ve_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ele]["V"][i_start:i_end, :, 0], axis=0
+            ).value
+            mask = np.abs(Ve_no_ms) > 1e-6  # Avoid division by near-zero
+            rel_error_Ve = np.zeros_like(Ve_no_ms)
+            rel_error_Ve[mask] = (Ve_with_ms[mask] - Ve_no_ms[mask]) / Ve_no_ms[mask] * 100
             
-            axes[1, 0].plot(self.x, rel_error_Te, 'b-', linewidth=2)
+            axes[1, 0].plot(self.x, rel_error_Ve, 'b-', linewidth=2)
             axes[1, 0].axhline(0, color='k', linestyle='--', alpha=0.3)
             axes[1, 0].set_xlabel('Position [m]')
             axes[1, 0].set_ylabel('Relative Error [%]')
-            axes[1, 0].set_title('Electron Temperature Error')
+            axes[1, 0].set_title('Electron Velocity (x) Error')
             axes[1, 0].grid(True, alpha=0.3)
         
-        if 'T' in self.sim_no_ms.particle_data[ion]:
-            Ti_no_ms = np.mean(
-                self.sim_no_ms.particle_data[ion]["T"][i_start:i_end], axis=0
-            )
-            Ti_with_ms = np.mean(
-                self.sim_with_ms.particle_data[ion]["T"][i_start:i_end], axis=0
-            )
-            rel_error_Ti = (Ti_with_ms - Ti_no_ms) / Ti_no_ms * 100
+        if 'Power' in self.sim_no_ms.particle_data[ele]:
+            Pe_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ele]["Power"][i_start:i_end], axis=0
+            ).value
+            Pe_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ele]["Power"][i_start:i_end], axis=0
+            ).value
+            mask = np.abs(Pe_no_ms) > 1e-6
+            rel_error_Pe = np.zeros_like(Pe_no_ms)
+            rel_error_Pe[mask] = (Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask] * 100
             
-            axes[1, 1].plot(self.x, rel_error_Ti, 'r-', linewidth=2)
+            axes[1, 1].plot(self.x, rel_error_Pe, 'g-', linewidth=2)
             axes[1, 1].axhline(0, color='k', linestyle='--', alpha=0.3)
             axes[1, 1].set_xlabel('Position [m]')
             axes[1, 1].set_ylabel('Relative Error [%]')
-            axes[1, 1].set_title('Ion Temperature Error')
+            axes[1, 1].set_title('Electron Power Deposition Error')
             axes[1, 1].grid(True, alpha=0.3)
         
         plt.tight_layout()
@@ -487,7 +458,7 @@ class DPMSA_Benchmark:
         print("DPMSA BENCHMARK REPORT")
         print("="*60)
         
-        # 1. Main comparison figure (6 subplots)
+        # 1. Main comparison figure (5 subplots)
         fig = plt.figure(figsize=(18, 12))
         gs = GridSpec(3, 2, figure=fig, hspace=0.3, wspace=0.3)
         
@@ -495,19 +466,29 @@ class DPMSA_Benchmark:
         self.compare_densities(time_index=time_index, ax=ax1)
         
         ax2 = fig.add_subplot(gs[0, 1])
-        self.compare_temperature(time_index=time_index, ax=ax2)
+        self.compare_velocity(time_index=time_index, ax=ax2, component=0)
         
         ax3 = fig.add_subplot(gs[1, 0])
-        self.compare_eepf(time_index=time_index, ax=ax3)
+        self.compare_power_deposition(time_index=time_index, ax=ax3)
         
         ax4 = fig.add_subplot(gs[1, 1])
-        self.compare_power_deposition(time_index=time_index, ax=ax4)
+        self.compare_particle_evolution(ax=ax4)
         
-        ax5 = fig.add_subplot(gs[2, 0])
-        self.compare_ionization_rate(time_index=time_index, ax=ax5)
+        # Add text summary
+        ax5 = fig.add_subplot(gs[2, :])
+        errors = self.compute_relative_errors(time_index=time_index)
         
-        ax6 = fig.add_subplot(gs[2, 1])
-        self.compare_particle_evolution(ax=ax6)
+        summary_text = "NUMERICAL ERROR SUMMARY\n\n"
+        for quantity, error_dict in errors.items():
+            summary_text += f"{quantity.upper().replace('_', ' ')}:\n"
+            summary_text += f"  Max: {error_dict['max_relative']*100:.2f}%  "
+            summary_text += f"Mean: {error_dict['mean_relative']*100:.2f}%  "
+            summary_text += f"RMS: {error_dict['rms']*100:.2f}%\n\n"
+        
+        ax5.text(0.1, 0.5, summary_text, transform=ax5.transAxes, 
+                fontsize=11, verticalalignment='center', family='monospace',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
+        ax5.axis('off')
         
         plt.suptitle('DPMSA Benchmark: Complete Comparison', fontsize=16, y=0.995)
         plt.savefig(os.path.join(output_dir, 'full_comparison.png'), dpi=300, bbox_inches='tight')
@@ -518,9 +499,7 @@ class DPMSA_Benchmark:
         plt.savefig(os.path.join(output_dir, 'relative_errors.png'), dpi=300, bbox_inches='tight')
         print(f"✓ Saved: {output_dir}/relative_errors.png")
         
-        # 3. Compute and print numerical errors
-        errors = self.compute_relative_errors(time_index=time_index)
-        
+        # 3. Print numerical errors
         print("\n" + "-"*60)
         print("NUMERICAL ERROR ANALYSIS")
         print("-"*60)
@@ -550,9 +529,7 @@ class DPMSA_Benchmark:
         np.savez(
             os.path.join(output_dir, 'benchmark_data.npz'),
             x=self.x.value,
-            errors_electron_density=errors['electron_density'],
-            errors_ion_density=errors['ion_density'],
-            errors_electron_temperature=errors.get('electron_temperature', {}),
+            **{k: v for k, v in errors.items()}
         )
         print(f"✓ Saved: {output_dir}/benchmark_data.npz")
         
@@ -591,27 +568,54 @@ def run_benchmark(path_without_ms, path_with_ms, output_dir='benchmark_results')
 
 
 if __name__ == "__main__":
-    """
-    Example execution
+    import argparse
     
-    To use this script:
-    1. Run your simulation WITHOUT merging/splitting
-    2. Run your simulation WITH merging/splitting (same configuration)
-    3. Update the paths below to your data folders
-    4. Run this script
-    """
+    parser = argparse.ArgumentParser(
+        description='Benchmark PIC simulations with and without DPMSA'
+    )
+    parser.add_argument(
+        'path_no_ms',
+        type=str,
+        help='Path to simulation data WITHOUT merging & splitting'
+    )
+    parser.add_argument(
+        'path_with_ms',
+        type=str,
+        help='Path to simulation data WITH merging & splitting'
+    )
+    parser.add_argument(
+        '--output',
+        '-o',
+        type=str,
+        default='benchmark_results',
+        help='Output directory for benchmark results (default: benchmark_results)'
+    )
+    parser.add_argument(
+        '--time-index',
+        '-t',
+        type=int,
+        default=-1,
+        help='Time index to compare (-1 for final time, default: -1)'
+    )
     
-    # UPDATE THESE PATHS to your actual simulation data folders
-    path_no_ms = "data/2026-02-08_12h17"
-    path_with_ms = "data/2026-02-08_13h14"
+    args = parser.parse_args()
     
     # Check if paths exist
-    if not os.path.exists(path_no_ms):
-        print(f"ERROR: Path not found: {path_no_ms}")
-        print("Please update the path_no_ms variable with your actual data folder")
-    elif not os.path.exists(path_with_ms):
-        print(f"ERROR: Path not found: {path_with_ms}")
-        print("Please update the path_with_ms variable with your actual data folder")
-    else:
-        # Run benchmark
-        benchmark, errors = run_benchmark(path_no_ms, path_with_ms)
+    if not os.path.exists(args.path_no_ms):
+        print(f"ERROR: Path not found: {args.path_no_ms}")
+        exit(1)
+    if not os.path.exists(args.path_with_ms):
+        print(f"ERROR: Path not found: {args.path_with_ms}")
+        exit(1)
+    
+    # Run benchmark
+    print(f"\nStarting DPMSA Benchmark...")
+    print(f"  Without M&S: {args.path_no_ms}")
+    print(f"  With M&S:    {args.path_with_ms}")
+    print(f"  Output:      {args.output}\n")
+    
+    benchmark, errors = run_benchmark(
+        args.path_no_ms, 
+        args.path_with_ms, 
+        output_dir=args.output
+    )
