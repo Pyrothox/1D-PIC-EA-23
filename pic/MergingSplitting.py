@@ -16,7 +16,7 @@ class DPMSA:
     def init_centers_in_cell(self, x, p, w, indices):
         indices = np.array(indices, dtype=int)
         Nc = indices.size
-        K0 = max(1, int(np.sqrt(Nc / 2.0)))
+        K0 = max(1, int(np.sqrt(Nc / 2.0))) * 10
 
         centers = [int(np.random.choice(indices))]
         while len(centers) < K0:
@@ -142,7 +142,6 @@ class DPMSA:
             new_clusters[cL] = gL
             new_clusters[cR] = gR
             del new_clusters[c]
-
         return np.array(new_centers, dtype=int), new_clusters
 
     # ---------- Step 4: merging ----------

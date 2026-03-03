@@ -132,7 +132,7 @@ class DPMSA_Benchmark:
         
         return ax
     
-    def compare_velocity(self, time_index=-1, average=5, ax=None, component=0):
+    def compare_velocity(self, time_index=-1, average=30, ax=None, component=0):
         """
         Compare electron and ion velocity profiles
         
