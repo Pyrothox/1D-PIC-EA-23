@@ -158,11 +158,28 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
             if pla.wall is not None:
                 pla.wall.update()
             pla.diagnostics.save_diags(nt, dataFileName)
-            dpmsa.execute(10)
-            pla.compute_rho()
-            pla.solve_poisson(12800)
-            pla.diags(12800)
-            pla.diagnostics.save_diags(nt, dataFileName)
+
+            # # état avant le merging
+            # for specie in pla.species.values():
+            #     print(specie.symbol)
+            #     print("poid total avant merging : ")
+            #     total_weight = np.sum(specie.w[:specie.Npart])
+            #     print(total_weight)
+            # pla.diagnostics.instant_save(nt, dataFileName, "BEFORE_MERGING")
+
+            # #merging
+            # dpmsa.execute(10)
+            # pla.compute_rho()
+
+            # #état après le merging
+            # for specie in pla.species.values():
+            #     print(specie.symbol)
+            #     print("poid total avant merging : ")
+            #     total_weight = np.sum(specie.w[:specie.Npart])
+            #     print(total_weight)
+            # pla.diagnostics.instant_save(nt, dataFileName, "AFTER_MERGING")
+
+
 
             # pla.recombine(pla.diagnostics.average)
             total_particles = sum((part.Npart for part in pla.species.values()))

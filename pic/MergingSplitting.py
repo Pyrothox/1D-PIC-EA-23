@@ -3,10 +3,11 @@ from pic.functions import get_particle_indexes_in_cells
 
 
 class DPMSA:
-    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000):
+    def __init__(self, plasma, cluster_size_min=20, merge_interval=10000, max_merge_fraction=0.5):
         self.plasma = plasma
         self.N_min = cluster_size_min
         self.merge_interval = merge_interval
+        self.max_merge_fraction = max_merge_fraction  # max fraction of particles that can be merged per call (0.0-1.0)
 
     # ---------- metric: Minkowski l=1 (1D–3V) ----------
     def distance(self, x1, x2, p1, p2):
@@ -161,6 +162,11 @@ class DPMSA:
         centers_list = list(centers)
         merged = {c: list(clusters[c]) for c in centers_list}
         used = set()
+        
+        # Calculate max particles that can be merged
+        total_particles = sum(len(v) for v in merged.values())
+        max_particles_to_merge = int(total_particles * self.max_merge_fraction)
+        particles_merged = 0
 
         for i in range(len(centers_list)):
             ci = centers_list[i]
@@ -172,12 +178,20 @@ class DPMSA:
                     continue
                 Dij = self.distance(x[ci], x[cj], p[ci], p[cj])
                 if Dij <= d_min:
-                    merged[ci].extend(merged[cj])
-                    used.add(cj)
-                    del merged[cj]
+                    # Check if merging would exceed the limit
+                    particles_to_merge = len(merged[cj])
+                    if particles_merged + particles_to_merge <= max_particles_to_merge:
+                        merged[ci].extend(merged[cj])
+                        particles_merged += particles_to_merge
+                        used.add(cj)
+                        del merged[cj]
 
         new_centers = np.array(list(merged.keys()), dtype=int)
         return new_centers, merged
+
+    # ---------- Step bonus: force split --------------------
+    def force_split_clusters(self, x, p, w, center, cluster):
+        return
 
     # ---------- cell-level DPMSA loop (steps 1–5) ----------
     def process_cell(self, x, p, w, indices):
@@ -189,16 +203,43 @@ class DPMSA:
         centers, K0 = self.init_centers_in_cell(x, p, w, indices)
         centers, clusters = self.sort_particles_in_cell(x, p, w, indices, centers)
 
+        iter_count = 0
+        max_iters = 20
         while True:
+            iter_count += 1
+            if iter_count > max_iters:
+                print(f"DPMSA: reached max iterations ({max_iters}) in process_cell; breaking to avoid infinite loop.")
+                break
+
             K = len(centers)
+            if K == 0:
+                print("DPMSA: no centers in cell; breaking.")
+                break
+
+            centers_before = set(int(c) for c in centers)
+
+            print("K: " + str(K) + ", K0: " + str(K0))
             if K <= K0 / 2:
+                print("DPMSA: too few centers, performing splitting.")
                 centers, clusters = self.split_clusters(x, p, w, centers, clusters)
                 centers, clusters = self.sort_particles_in_cell(x, p, w, indices, centers)
             elif K >= 2 * K0:
+                print("DPMSA: too many centers, performing merging.")
                 centers, clusters = self.merge_clusters(x, p, centers, clusters)
                 centers, clusters = self.sort_particles_in_cell(x, p, w, indices, centers)
             else:
                 break
+
+            centers_after = set(int(c) for c in centers)
+            if centers_after == centers_before:
+                print("DPMSA: centers unchanged after split/merge+sort; breaking to avoid infinite loop.")
+                break
+        
+        ## Splitting the heavely merged clusters to reduce noise
+
+
+
+
 
         x_new, p_new, w_new = [], [], []
         for c, group in clusters.items():
@@ -219,10 +260,9 @@ class DPMSA:
         return np.array(x_new), np.array(p_new), np.array(w_new)
 
     # ---------- public entry ----------
-    def execute(self, nt):
-        if nt - 10 % self.merge_interval != 0:
-            return
-        print(f"DPMSA executing at nt={nt}")
+    def execute(self, nt, merge_interval=None):
+        interval = merge_interval if merge_interval is not None else self.merge_interval
+        print(f"DPMSA executing at nt={nt}, merge_interval={interval}")
         tabx = self.plasma.x_j
         dx = self.plasma.dx
         Ncells = self.plasma.N_cells

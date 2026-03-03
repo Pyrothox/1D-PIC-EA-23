@@ -49,6 +49,8 @@ class Diagnostics:
                 match quant:
                     case "n":
                         self.measures.append(Measure_n(plasma, specie, value_dict))
+                    case "n_evolution":
+                        self.measures.append(Measure_n_evolution(plasma, specie, value_dict))
                     case "V":
                         self.measures.append(Measure_V(plasma, specie, value_dict))
                     case "V2":
@@ -163,6 +165,52 @@ class Diagnostics:
                 m.save(f)
                 m.reset()
 
+    def instant_save(self, nt, folder, petitnomrigolo):
+        with h5py.File(path.join(folder, f"{nt + 1}"+petitnomrigolo+".h5"), "a") as f:
+            pla = self.measures[0].plasma
+            grp = f.create_group("time")
+            grp.attrs["nt"] = nt
+            grp.attrs["dt"] = pla.dT
+            grp.attrs["instant_time"] = nt*pla.dT
+            for specie in pla.species.values(): 
+                # saving instant density :
+                values = specie.n/pla.dx # convert to density by dividing by cell length
+                f.create_dataset(f"{specie.symbol}/instant density", data=values)
+
+                # saving instantaneous velocity distribution (weighted by particle weights)
+                Np = int(specie.Npart)
+                nbins = 200
+                vmax = 1.0
+                
+                if Np > 0:
+                    # choose x-component (centered if requested)
+                    if getattr(specie, "need_c", False):
+                        vx = specie.V[:Np, 0] - specie.c[:Np, 0]
+                    else:
+                        vx = specie.V[:Np, 0]
+                    w = specie.w[:Np]
+
+                    # build symmetric velocity bins around zero
+                    vmax = np.max(np.abs(vx)) if np.any(np.isfinite(vx)) else 1.0
+                    vmax = max(vmax * 1.1, 1e-8)
+                    edges = np.linspace(-vmax, vmax, nbins + 1)
+                    hist, _ = np.histogram(vx, bins=edges, weights=w)
+                    centers = 0.5 * (edges[:-1] + edges[1:])
+
+                else:
+                    # no particles: empty arrays
+                    centers = np.zeros(nbins)
+                    hist = np.zeros(nbins)
+
+                # Normalize VDF using the same normalization as MeasureVelocityDistribution
+                # N_average=1 (instantaneous), probe_size=Lx (no spatial subdivision)
+                hist *= (nbins / (pla.Lx * vmax))
+
+                f.create_dataset(f"{specie.symbol}/instant_vdf", data=hist)
+                f.create_dataset(f"{specie.symbol}/instant_vdf_bins", data=centers)
+
+
+
 
 class Measure:
     def __init__(self, name, plasma: Plasma):
@@ -204,6 +252,20 @@ class Measure_n(ParticleMeasure):
     def average(self, N_average):
         # values are sums of particle weights per cell collected over records
         self.values *= 1.0 / (self.plasma.dx * N_average)
+
+class Measure_n_evolution(ParticleMeasure):
+    def __init__(self, plasma, specie, value_dict):
+        super().__init__("n_evolution", plasma, specie, value_dict)
+        values = []
+        value_dict[(specie.symbol, self.name)] = self.values
+        self.current_step = 0
+
+    def record(self):
+            self.values.append(self.particles.n[self.plasma.N_cells//2] / self.plasma.dx)
+            self.current_step += 1
+
+    def average(self, N_average):
+        pass # no averaging needed for evolution diagnostics
 
 
 class Measure_phi(Measure):
