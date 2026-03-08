@@ -29,6 +29,8 @@ if TYPE_CHECKING:
     from pic.plasma import Plasma
     from pic.MCC import MCC, InterspeciesMCC
 
+from scipy.constants import k, e
+
 eps0_v = eps0.si.value
 
 
@@ -51,6 +53,8 @@ class Diagnostics:
                         self.measures.append(Measure_n(plasma, specie, value_dict))
                     case "n_evolution":
                         self.measures.append(Measure_n_evolution(plasma, specie, value_dict))
+                    case "mean_energy_evolution":
+                        self.measures.append(Measure_mean_energy_evolution(plasma, specie, value_dict))
                     case "V":
                         self.measures.append(Measure_V(plasma, specie, value_dict))
                     case "V2":
@@ -209,6 +213,9 @@ class Diagnostics:
                 f.create_dataset(f"{specie.symbol}/instant_vdf", data=hist)
                 f.create_dataset(f"{specie.symbol}/instant_vdf_bins", data=centers)
 
+            # saving instant electric potential
+            f.create_dataset("phi", data=pla.phi)
+
 
 
 
@@ -255,17 +262,75 @@ class Measure_n(ParticleMeasure):
 
 class Measure_n_evolution(ParticleMeasure):
     def __init__(self, plasma, specie, value_dict):
+        # We want a 1‑D time history rather than an array over cells, so
+        # override the numpy array that ParticleMeasure.__init__ created and
+        # keep plain Python lists.  Record the new lists in the value_dict.
         super().__init__("n_evolution", plasma, specie, value_dict)
-        values = []
+        self.average_values: list[float] = []
+        self.central_values: list[float] = []
+        value_dict[(specie.symbol, "n_evolution_average")] = self.average_values
+        value_dict[(specie.symbol, "n_evolution_central")] = self.central_values
+        self.current_step = 0
+
+    def record(self):
+        # append the average density over the domain (converted to a physical density)
+        self.average_values.append(np.mean(self.particles.n) / self.plasma.dx)
+        # append the central cell density (previous method)
+        central_index = self.plasma.N_cells // 2
+        self.central_values.append(self.particles.n[central_index] / self.plasma.dx)
+        self.current_step += 1
+
+    def average(self, N_average):
+        # no averaging for an evolution diagnostic
+        pass
+
+    def reset(self):
+        # called by Diagnostics.save_diags; clear history between files
+        self.average_values = []
+        self.central_values = []
+
+    def save(self, f):
+        # convert to numpy arrays when writing so h5py handles it cleanly
+        arr_avg = np.array(self.average_values, dtype="float64")
+        f.create_dataset(f"{self.specie.symbol}/n_evolution_average", data=arr_avg)
+        arr_cen = np.array(self.central_values, dtype="float64")
+        f.create_dataset(f"{self.specie.symbol}/n_evolution_central", data=arr_cen)
+
+
+class Measure_mean_energy_evolution(ParticleMeasure):
+    def __init__(self, plasma, specie, value_dict):
+        # Similar to n_evolution, but for mean kinetic energy
+        super().__init__("mean_energy_evolution", plasma, specie, value_dict)
+        self.values: list[float] = []
         value_dict[(specie.symbol, self.name)] = self.values
         self.current_step = 0
 
     def record(self):
-            self.values.append(self.particles.n[self.plasma.N_cells//2] / self.plasma.dx)
-            self.current_step += 1
+        # Compute mean kinetic energy over all particles
+        Np = self.particles.Npart
+        if Np > 0:
+            # Kinetic energy: 1/2 m v^2
+            v_squared = np.sum(np.square(self.particles.V[:Np]), axis=1)
+            energies = 0.5 * self.particles.m * v_squared
+            weights = self.particles.w[:Np]
+            mean_energy = np.average(energies, weights=weights)
+        else:
+            mean_energy = 0.0
+        self.values.append(mean_energy)
+        self.current_step += 1
 
     def average(self, N_average):
-        pass # no averaging needed for evolution diagnostics
+        # no averaging for an evolution diagnostic
+        pass
+
+    def reset(self):
+        # called by Diagnostics.save_diags; clear history between files
+        self.values = []
+
+    def save(self, f):
+        # convert to numpy array when writing so h5py handles it cleanly
+        arr = np.array(self.values, dtype="float64")
+        f.create_dataset(f"{self.specie.symbol}/{self.name}", data=arr)
 
 
 class Measure_phi(Measure):

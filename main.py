@@ -154,30 +154,29 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
                 pla.solve_poisson(nt)
                 pla.diags(nt)
                 
+                for part in pla.species.values():
+                    if part.symbol == "e-" and part.Npart > 2e5:
+                        for part in pla.species.values():
+                            print(f"{part.symbol} has {part.Npart} particles")
+                        Npart = part.Npart
+                        print(f"Warning: number of particles e- is {Npart}, proceeding to merging")
+                        #état avant le merging
+                        pla.diagnostics.instant_save(nt, dataFileName, "BEFORE_MERGING")
+                        #merging
+                        dpmsa.execute(10)
+                        pla.compute_rho()
+                        #état après le merging
+                        pla.diagnostics.instant_save(nt, dataFileName, "AFTER_MERGING")
+                        total_particles = sum((part.Npart for part in pla.species.values()))
+                        for part in pla.species.values():
+                            print(f"{part.symbol} has {part.Npart} particles")
+                        print(f"number of particles after merging: {total_particles}")
+
             pla.diagnostics.average_diags(parameters["n_average"])
             if pla.wall is not None:
                 pla.wall.update()
             pla.diagnostics.save_diags(nt, dataFileName)
 
-            # # état avant le merging
-            # for specie in pla.species.values():
-            #     print(specie.symbol)
-            #     print("poid total avant merging : ")
-            #     total_weight = np.sum(specie.w[:specie.Npart])
-            #     print(total_weight)
-            # pla.diagnostics.instant_save(nt, dataFileName, "BEFORE_MERGING")
-
-            # #merging
-            # dpmsa.execute(10)
-            # pla.compute_rho()
-
-            # #état après le merging
-            # for specie in pla.species.values():
-            #     print(specie.symbol)
-            #     print("poid total avant merging : ")
-            #     total_weight = np.sum(specie.w[:specie.Npart])
-            #     print(total_weight)
-            # pla.diagnostics.instant_save(nt, dataFileName, "AFTER_MERGING")
 
 
 

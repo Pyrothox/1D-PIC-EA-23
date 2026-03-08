@@ -92,6 +92,7 @@ class Plasma:
         # particles
         self.species: Dict[particles.ParticleLike, ParticlesGroup] = {}
         self.part_out: Dict[particles.ParticleLike, int] = {}
+        self.inj_diag: bool = False
         for part, start in species.items():
             part_group = ParticlesGroup(
                 part.mass.to_value(u.kg),
@@ -420,8 +421,8 @@ class Plasma:
 
         v_elecs = max_vect3D(len(x), elecs.T, elecs.m)
         v_ions = max_vect3D(len(x), ions.T, ions.m)
-        elecs.add_particles(x, v_elecs)
-        ions.add_particles(x, v_ions)
+        elecs.add_particles(x, v_elecs, w)
+        ions.add_particles(x, v_ions, w)
         self.part_out[specie] = 0
         self.part_out[particles.electron] -= len(x)
         if self.inj_diag:
