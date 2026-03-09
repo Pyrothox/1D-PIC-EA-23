@@ -15,6 +15,7 @@ from datetime import datetime
 from pathlib import Path
 import signal
 import sys
+import h5py
 
 ## Parameters ##
 
@@ -150,7 +151,18 @@ def start(parameters, restart=None, wall_time=None, name=None, prof=False):
                 pla.boundary()
                 pla.apply_mcc()
                 pla.inject()
-                dpmsa.execute(25599)
+                if nt == 10:
+                    dpmsa.execute(nt)
+                    # Save diagnostics immediately after DPMSA to observe its impact
+                    with h5py.File(path.join(dataFileName, "after_dpmsa.h5"), "w") as f:
+                        pla_obj = pla.diagnostics.measures[0].plasma
+                        grp = f.create_group("time")
+                        grp.attrs["nt"] = nt
+                        grp.attrs["dt"] = pla_obj.dT
+                        grp.attrs["instant_time"] = nt * pla_obj.dT
+                        for m in pla.diagnostics.measures:
+                            m.save(f)
+                            m.reset()
                 pla.compute_rho()
                 pla.solve_poisson(nt)
                 pla.diags(nt)

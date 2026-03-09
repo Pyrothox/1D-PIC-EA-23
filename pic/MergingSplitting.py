@@ -3,7 +3,7 @@ from pic.functions import get_particle_indexes_in_cells
 
 
 class DPMSA:
-    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.5):
+    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.2):
         self.plasma = plasma
         self.N_min = cluster_size_min
         self.merge_interval = merge_interval
@@ -17,7 +17,7 @@ class DPMSA:
     def init_centers_in_cell(self, x, p, w, indices):
         indices = np.array(indices, dtype=int)
         Nc = indices.size
-        K0 = max(1, int(np.sqrt(Nc / 2.0))) * 10
+        K0 = max(1, int(np.sqrt(Nc / 2.0)))
 
         centers = [int(np.random.choice(indices))]
         while len(centers) < K0:

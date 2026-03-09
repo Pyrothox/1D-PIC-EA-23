@@ -242,10 +242,30 @@ class Measure_V(ParticleMeasure):
         self.particles.need_u = True
 
     def record(self):
-        self.values += self.particles.u
+        # Record weighted velocity for each component
+        for component in range(3):
+            info = (
+                self.particles.V[: self.particles.Npart, component]
+                * self.particles.w[: self.particles.Npart]
+            )
+            particle_to_grid(
+                self.particles.Npart,
+                self.particles.x[: self.particles.Npart],
+                info,
+                self.plasma.x_j,
+                self.values[:, component],
+                self.plasma.dx,
+            )
 
     def average(self, N_average):
-        self.values /= N_average
+        # Divide by density to get weighted average velocity
+        # Account for both averaging window and density calculation
+        np.divide(
+            self.values,
+            self.particles.n[:, None] * self.plasma.dx * N_average,
+            where=self.particles.n[:, None] != 0.0,
+            out=self.values,
+        )
 
 
 class Measure_V2(ParticleMeasure):
@@ -256,10 +276,25 @@ class Measure_V2(ParticleMeasure):
         self.particles.need_u = True
 
     def record(self):
-        self.values += np.sum(np.square(self.particles.u), axis=1)
+        # Record weighted squared velocity sum
+        info = np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart]
+        particle_to_grid(
+            self.particles.Npart,
+            self.particles.x[: self.particles.Npart],
+            info,
+            self.plasma.x_j,
+            self.values,
+            self.plasma.dx,
+        )
 
     def average(self, N_average):
-        self.values /= N_average
+        # Divide by density to get weighted average squared velocity
+        np.divide(
+            self.values,
+            self.particles.n * self.plasma.dx * N_average,
+            where=self.particles.n != 0.0,
+            out=self.values,
+        )
 
 
 class Measure_J(ParticleMeasure):
