@@ -1,21 +1,21 @@
 DPMSA BENCHMARK - ERROR SUMMARY
 ============================================================
 
-Simulation without M&S: data\2026-03-09_19h21
-Simulation with M&S:    data\2026-03-09_20h00
+Simulation without M&S: data\max_frac_50
+Simulation with M&S:    data\max_frac_1
 
 
 ELECTRON DENSITY:
-  Max relative error:  12.6263%
-  Mean relative error: 6.0729%
-  RMS error:           7.1395%
+  Max relative error:  18.8081%
+  Mean relative error: 9.2846%
+  RMS error:           10.5325%
 
 ION DENSITY:
-  Max relative error:  19.1129%
-  Mean relative error: 5.6805%
-  RMS error:           6.9461%
+  Max relative error:  22.1765%
+  Mean relative error: 7.8961%
+  RMS error:           9.8436%
 
 ELECTRON POWER:
-  Max relative error:  1363.0593%
-  Mean relative error: 28.5297%
-  RMS error:           125.4187%
+  Max relative error:  350.0148%
+  Mean relative error: 26.5945%
+  RMS error:           60.9244%

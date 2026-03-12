@@ -3,7 +3,7 @@ from pic.functions import get_particle_indexes_in_cells
 
 
 class DPMSA:
-    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.2):
+    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.01):
         self.plasma = plasma
         self.N_min = cluster_size_min
         self.merge_interval = merge_interval
@@ -177,10 +177,7 @@ class DPMSA:
                     continue
                 Dij = self.distance(x[ci], x[cj], p[ci], p[cj])
                 if Dij <= d_min:
-                    merged[ci].extend(merged[cj])
-                    used.add(cj)
-                    del merged[cj]
-                    # Check if merging would exceed the limit
+                    # Check if merging would exceed the limit BEFORE merging
                     particles_to_merge = len(merged[cj])
                     if particles_merged + particles_to_merge <= max_particles_to_merge:
                         merged[ci].extend(merged[cj])
