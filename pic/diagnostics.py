@@ -237,11 +237,16 @@ class Measure_V(ParticleMeasure):
     def __init__(self, plasma, specie, value_dict):
         super().__init__("V", plasma, specie, value_dict)
         self.values = np.zeros((plasma.N_cells, 3), dtype="float64", order="F")
+        self.n_values = np.zeros((plasma.N_cells), dtype="float64")
         value_dict[(specie.symbol, self.name)] = self.values
 
         self.particles.need_u = True
 
     def record(self):
+        # Accumulate weighted particle count per cell over the same window
+        # used for momentum accumulation, so normalization is time-consistent.
+        self.n_values += self.particles.n
+
         # Record weighted velocity for each component
         for component in range(3):
             info = (
@@ -258,24 +263,34 @@ class Measure_V(ParticleMeasure):
             )
 
     def average(self, N_average):
-        # Divide by density to get weighted average velocity
-        # Account for both averaging window and density calculation
+        # Divide accumulated weighted momentum by accumulated weighted count.
+        denom = self.n_values
+        valid = denom != 0.0
         np.divide(
             self.values,
-            self.particles.n[:, None] * self.plasma.dx * N_average,
-            where=self.particles.n[:, None] != 0.0,
+            denom[:, None],
+            where=valid[:, None],
             out=self.values,
         )
+        self.values[~valid, :] = 0.0
+
+    def reset(self):
+        super().reset()
+        self.n_values.fill(0.0)
 
 
 class Measure_V2(ParticleMeasure):
     def __init__(self, plasma, specie, value_dict):
         super().__init__("V2", plasma, specie, value_dict)
+        self.n_values = np.zeros((plasma.N_cells), dtype="float64")
         value_dict[(specie.symbol, self.name)] = self.values
 
         self.particles.need_u = True
 
     def record(self):
+        # Keep denominator consistent with the averaging window.
+        self.n_values += self.particles.n
+
         # Record weighted squared velocity sum
         info = np.sum(np.square(self.particles.V[: self.particles.Npart]), axis=1) * self.particles.w[: self.particles.Npart]
         particle_to_grid(
@@ -288,13 +303,20 @@ class Measure_V2(ParticleMeasure):
         )
 
     def average(self, N_average):
-        # Divide by density to get weighted average squared velocity
+        # Divide accumulated weighted v^2 sum by accumulated weighted count.
+        denom = self.n_values
+        valid = denom != 0.0
         np.divide(
             self.values,
-            self.particles.n * self.plasma.dx * N_average,
-            where=self.particles.n != 0.0,
+            denom,
+            where=valid,
             out=self.values,
         )
+        self.values[~valid] = 0.0
+
+    def reset(self):
+        super().reset()
+        self.n_values.fill(0.0)
 
 
 class Measure_J(ParticleMeasure):

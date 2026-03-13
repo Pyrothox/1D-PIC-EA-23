@@ -11,6 +11,7 @@ Author: Manef
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
 from matplotlib.gridspec import GridSpec
 import pickle
 from pathlib import Path
@@ -132,7 +133,7 @@ class DPMSA_Benchmark:
         
         return ax
     
-    def compare_velocity(self, time_index=-1, average=30, ax=None, component=0):
+    def compare_velocity(self, time_index=-1, average=30, ax=None, component=0, min_density_fraction=1e-3):
         """
         Compare electron and ion velocity profiles
         
@@ -155,6 +156,18 @@ class DPMSA_Benchmark:
             Ve_with_ms = np.mean(
                 self.sim_with_ms.particle_data[ele]["V"][i_start:i_end, :, component], axis=0
             )
+            ne_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ele]["n"][i_start:i_end], axis=0
+            )
+            ne_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ele]["n"][i_start:i_end], axis=0
+            )
+
+            # Mask very low-density cells where velocity averages are numerically noisy.
+            ne_thr_no_ms = np.max(ne_no_ms) * min_density_fraction
+            ne_thr_with_ms = np.max(ne_with_ms) * min_density_fraction
+            Ve_no_ms = np.where(ne_no_ms >= ne_thr_no_ms, Ve_no_ms, np.nan)
+            Ve_with_ms = np.where(ne_with_ms >= ne_thr_with_ms, Ve_with_ms, np.nan)
             
             ax.plot(self.x, Ve_no_ms, 'b-', linewidth=2, label='Electron (No M&S)')
             ax.plot(self.x, Ve_with_ms, 'b--', linewidth=2, label='Electron (With M&S)')
@@ -166,6 +179,17 @@ class DPMSA_Benchmark:
             Vi_with_ms = np.mean(
                 self.sim_with_ms.particle_data[ion]["V"][i_start:i_end, :, component], axis=0
             )
+            ni_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ion]["n"][i_start:i_end], axis=0
+            )
+            ni_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ion]["n"][i_start:i_end], axis=0
+            )
+
+            ni_thr_no_ms = np.max(ni_no_ms) * min_density_fraction
+            ni_thr_with_ms = np.max(ni_with_ms) * min_density_fraction
+            Vi_no_ms = np.where(ni_no_ms >= ni_thr_no_ms, Vi_no_ms, np.nan)
+            Vi_with_ms = np.where(ni_with_ms >= ni_thr_with_ms, Vi_with_ms, np.nan)
             
             ax.plot(self.x, Vi_no_ms, 'r-', linewidth=2, label='Ion (No M&S)')
             ax.plot(self.x, Vi_with_ms, 'r--', linewidth=2, label='Ion (With M&S)')
@@ -269,32 +293,35 @@ class DPMSA_Benchmark:
         ) * dx
         
         n_files = min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
+        # Index 0 is an unfilled buffer slot in Hdf5Viewer arrays.
+        start_idx = 1
+        end_idx = n_files + 1
         
         ax.plot(
-            self.t[:n_files], 
-            n_electrons_no_ms[:n_files], 
+            self.t[start_idx:end_idx], 
+            n_electrons_no_ms[start_idx:end_idx], 
             'b-', 
             linewidth=2, 
             label='Electrons (No M&S)'
         )
         ax.plot(
-            self.t[:n_files], 
-            n_electrons_with_ms[:n_files], 
+            self.t[start_idx:end_idx], 
+            n_electrons_with_ms[start_idx:end_idx], 
             'b--', 
             linewidth=2, 
             label='Electrons (With M&S)'
         )
         
         ax.plot(
-            self.t[:n_files], 
-            n_ions_no_ms[:n_files], 
+            self.t[start_idx:end_idx], 
+            n_ions_no_ms[start_idx:end_idx], 
             'r-', 
             linewidth=2, 
             label='Ions (No M&S)'
         )
         ax.plot(
-            self.t[:n_files], 
-            n_ions_with_ms[:n_files], 
+            self.t[start_idx:end_idx], 
+            n_ions_with_ms[start_idx:end_idx], 
             'r--', 
             linewidth=2, 
             label='Ions (With M&S)'
@@ -319,6 +346,19 @@ class DPMSA_Benchmark:
         i_end = min(i_start + average, i + 1)
         
         errors = {}
+
+        def relative_stats(ref, val, min_ref_frac=1e-6):
+            ref_abs = np.abs(ref)
+            thresh = np.max(ref_abs) * min_ref_frac
+            mask = ref_abs > thresh
+            if not np.any(mask):
+                return None
+            rel = (val[mask] - ref[mask]) / ref[mask]
+            return {
+                'max_relative': float(np.max(np.abs(rel))),
+                'mean_relative': float(np.mean(np.abs(rel))),
+                'rms': float(np.sqrt(np.mean(rel**2))),
+            }
         
         # Electron density error
         ne_no_ms = np.mean(
@@ -327,11 +367,9 @@ class DPMSA_Benchmark:
         ne_with_ms = np.mean(
             self.sim_with_ms.particle_data[ele]["n"][i_start:i_end], axis=0
         )
-        errors['electron_density'] = {
-            'max_relative': float(np.max(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms))),
-            'mean_relative': float(np.mean(np.abs((ne_with_ms - ne_no_ms) / ne_no_ms))),
-            'rms': float(np.sqrt(np.mean(((ne_with_ms - ne_no_ms) / ne_no_ms)**2)))
-        }
+        ne_stats = relative_stats(ne_no_ms.value, ne_with_ms.value)
+        if ne_stats is not None:
+            errors['electron_density'] = ne_stats
         
         # Ion density error
         ni_no_ms = np.mean(
@@ -340,11 +378,9 @@ class DPMSA_Benchmark:
         ni_with_ms = np.mean(
             self.sim_with_ms.particle_data[ion]["n"][i_start:i_end], axis=0
         )
-        errors['ion_density'] = {
-            'max_relative': float(np.max(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms))),
-            'mean_relative': float(np.mean(np.abs((ni_with_ms - ni_no_ms) / ni_no_ms))),
-            'rms': float(np.sqrt(np.mean(((ni_with_ms - ni_no_ms) / ni_no_ms)**2)))
-        }
+        ni_stats = relative_stats(ni_no_ms.value, ni_with_ms.value)
+        if ni_stats is not None:
+            errors['ion_density'] = ni_stats
         
         # Power deposition errors (if available)
         if 'Power' in self.sim_no_ms.particle_data[ele]:
@@ -354,14 +390,37 @@ class DPMSA_Benchmark:
             Pe_with_ms = np.mean(
                 self.sim_with_ms.particle_data[ele]["Power"][i_start:i_end], axis=0
             ).value
-            # Avoid division by very small numbers
-            mask = np.abs(Pe_no_ms) > 1e-10
-            if np.any(mask):
-                errors['electron_power'] = {
-                    'max_relative': float(np.max(np.abs((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask]))),
-                    'mean_relative': float(np.mean(np.abs((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask]))),
-                    'rms': float(np.sqrt(np.mean(((Pe_with_ms[mask] - Pe_no_ms[mask]) / Pe_no_ms[mask])**2)))
-                }
+            pe_stats = relative_stats(Pe_no_ms, Pe_with_ms, min_ref_frac=1e-8)
+            if pe_stats is not None:
+                errors['electron_power'] = pe_stats
+
+        if 'Power' in self.sim_no_ms.particle_data[ion]:
+            Pi_no_ms = np.mean(
+                self.sim_no_ms.particle_data[ion]["Power"][i_start:i_end], axis=0
+            ).value
+            Pi_with_ms = np.mean(
+                self.sim_with_ms.particle_data[ion]["Power"][i_start:i_end], axis=0
+            ).value
+            pi_stats = relative_stats(Pi_no_ms, Pi_with_ms, min_ref_frac=1e-8)
+            if pi_stats is not None:
+                errors['ion_power'] = pi_stats
+
+        # Particle-conservation error over time (integrated density trend).
+        n_files = min(self.sim_no_ms.n_files, self.sim_with_ms.n_files)
+        start_idx = 1
+        end_idx = n_files + 1
+        dx = self.sim_no_ms.dx.value
+        n_e_no = np.sum(self.sim_no_ms.particle_data[ele]["n"], axis=1).value * dx
+        n_e_ms = np.sum(self.sim_with_ms.particle_data[ele]["n"], axis=1).value * dx
+        n_i_no = np.sum(self.sim_no_ms.particle_data[ion]["n"], axis=1).value * dx
+        n_i_ms = np.sum(self.sim_with_ms.particle_data[ion]["n"], axis=1).value * dx
+
+        e_cons_stats = relative_stats(n_e_no[start_idx:end_idx], n_e_ms[start_idx:end_idx], min_ref_frac=1e-12)
+        if e_cons_stats is not None:
+            errors['electron_particle_conservation'] = e_cons_stats
+        i_cons_stats = relative_stats(n_i_no[start_idx:end_idx], n_i_ms[start_idx:end_idx], min_ref_frac=1e-12)
+        if i_cons_stats is not None:
+            errors['ion_particle_conservation'] = i_cons_stats
         
         return errors
     
@@ -382,7 +441,9 @@ class DPMSA_Benchmark:
         ne_with_ms = np.mean(
             self.sim_with_ms.particle_data[ele]["n"][i_start:i_end], axis=0
         ).value
-        rel_error_ne = (ne_with_ms - ne_no_ms) / ne_no_ms * 100
+        mask_ne = np.abs(ne_no_ms) > (np.max(np.abs(ne_no_ms)) * 1e-6)
+        rel_error_ne = np.full_like(ne_no_ms, np.nan)
+        rel_error_ne[mask_ne] = (ne_with_ms[mask_ne] - ne_no_ms[mask_ne]) / ne_no_ms[mask_ne] * 100
         
         axes[0, 0].plot(self.x, rel_error_ne, 'b-', linewidth=2)
         axes[0, 0].axhline(0, color='k', linestyle='--', alpha=0.3)
@@ -398,7 +459,9 @@ class DPMSA_Benchmark:
         ni_with_ms = np.mean(
             self.sim_with_ms.particle_data[ion]["n"][i_start:i_end], axis=0
         ).value
-        rel_error_ni = (ni_with_ms - ni_no_ms) / ni_no_ms * 100
+        mask_ni = np.abs(ni_no_ms) > (np.max(np.abs(ni_no_ms)) * 1e-6)
+        rel_error_ni = np.full_like(ni_no_ms, np.nan)
+        rel_error_ni[mask_ni] = (ni_with_ms[mask_ni] - ni_no_ms[mask_ni]) / ni_no_ms[mask_ni] * 100
         
         axes[0, 1].plot(self.x, rel_error_ni, 'r-', linewidth=2)
         axes[0, 1].axhline(0, color='k', linestyle='--', alpha=0.3)
@@ -458,9 +521,9 @@ class DPMSA_Benchmark:
         print("DPMSA BENCHMARK REPORT")
         print("="*60)
         
-        # 1. Main comparison figure (5 subplots)
-        fig = plt.figure(figsize=(18, 12))
-        gs = GridSpec(3, 2, figure=fig, hspace=0.3, wspace=0.3)
+        # 1. Main comparison figure (4 subplots)
+        fig = plt.figure(figsize=(18, 9))
+        gs = GridSpec(2, 2, figure=fig, hspace=0.3, wspace=0.3)
         
         ax1 = fig.add_subplot(gs[0, 0])
         self.compare_densities(time_index=time_index, ax=ax1)
@@ -473,22 +536,28 @@ class DPMSA_Benchmark:
         
         ax4 = fig.add_subplot(gs[1, 1])
         self.compare_particle_evolution(ax=ax4)
+
+        # Remove repeated per-axis legends and use one shared custom legend.
+        for axis in (ax1, ax2, ax3, ax4):
+            legend = axis.get_legend()
+            if legend is not None:
+                legend.remove()
+
+        legend_handles = [
+            mlines.Line2D([0], [0], color='b', linestyle='-', linewidth=2, label='Electron (No M&S)'),
+            mlines.Line2D([0], [0], color='b', linestyle='--', linewidth=2, label='Electron (With M&S)'),
+            mlines.Line2D([0], [0], color='r', linestyle='-', linewidth=2, label='Ion (No M&S)'),
+            mlines.Line2D([0], [0], color='r', linestyle='--', linewidth=2, label='Ion (With M&S)'),
+        ]
+        fig.legend(
+            handles=legend_handles,
+            loc='upper center',
+            ncol=4,
+            bbox_to_anchor=(0.5, 0.975),
+            frameon=True,
+        )
         
-        # Add text summary
-        ax5 = fig.add_subplot(gs[2, :])
         errors = self.compute_relative_errors(time_index=time_index)
-        
-        summary_text = "NUMERICAL ERROR SUMMARY\n\n"
-        for quantity, error_dict in errors.items():
-            summary_text += f"{quantity.upper().replace('_', ' ')}:\n"
-            summary_text += f"  Max: {error_dict['max_relative']*100:.2f}%  "
-            summary_text += f"Mean: {error_dict['mean_relative']*100:.2f}%  "
-            summary_text += f"RMS: {error_dict['rms']*100:.2f}%\n\n"
-        
-        ax5.text(0.1, 0.5, summary_text, transform=ax5.transAxes, 
-                fontsize=11, verticalalignment='center', family='monospace',
-                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.3))
-        ax5.axis('off')
         
         plt.suptitle('DPMSA Benchmark: Complete Comparison', fontsize=16, y=0.995)
         plt.savefig(os.path.join(output_dir, 'full_comparison.png'), dpi=300, bbox_inches='tight')

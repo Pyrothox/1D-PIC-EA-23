@@ -3,7 +3,7 @@ from pic.functions import get_particle_indexes_in_cells
 
 
 class DPMSA:
-    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.01):
+    def __init__(self, plasma, cluster_size_min=4, merge_interval=10000, max_merge_fraction=0.1):
         self.plasma = plasma
         self.N_min = cluster_size_min
         self.merge_interval = merge_interval
